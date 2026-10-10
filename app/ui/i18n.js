@@ -1,4 +1,4 @@
-// UI strings. English first (public release); Spanish picked automatically from the OS language.
+// UI strings. English first (public release); Chinese / Spanish picked automatically from the OS language.
 (() => {
   const S = {
     en: {
@@ -117,6 +117,64 @@
       canvas: "Lienzo", remove: "Quitar", rotate: "Girar 90°", refs: "ref.",
       eventsFail: "No se pudieron registrar los eventos (revisá capabilities/default.json): ",
     },
+    zh: {
+      openFolder: "打开文件夹",
+      engineReady: "引擎已就绪", engineReadyExt: "引擎已就绪（外部）", engineStarting: "引擎启动中",
+      engineError: "引擎出错", engineOff: "引擎已关闭", stopEngine: "停止引擎", startEngine: "启动引擎", starting: "启动中…",
+      externalTip: "这个引擎是被其他程序启动的；请到那边关闭它。",
+      setupTitle: "安装 Qwen Image Local",
+      setupLead: "只需安装一次。全程在你的 GPU 上运行，生成的内容不会离开这台电脑。",
+      yourGpu: "你的 GPU", vramProfile: "显存档位", recommended: "推荐",
+      profBalanced: "均衡 · 12 GB+", profBalancedMeta: "int8 编码器 · 已在 RTX 3060 实测",
+      profCompact: "紧凑 · 约 10 GB", profCompactMeta: "w4a8 编码器 · 省 2.5 GB · 实验性",
+      genModel: "生成模型",
+      ditOfficial: "官方", ditOfficialMeta: "Comfy-Org · int8 convrot",
+      ditUncensored: "无审查", ditUncensoredMeta: "第三方 · int8 convrot",
+      ditHint: "官方权重来自 Comfy-Org。无审查版是第三方发布，需要单独下载约 6.8 GB。",
+      ditMainHint: "下次生成时生效。如果模型还没下载，会跳回安装界面。",
+      ditInstalled: "已安装", ditMissing: "未下载",
+      ditNeedInstall: (m) => `${m} 还没下载，请到安装界面完成下载。`,
+      ditSwitched: (m) => `已切换到 ${m}。`,
+      modelsFolder: "模型文件夹", change: "更改…",
+      modelsHint: "大约需要 17 GB。已经有 Qwen-Image-2.1 的权重？选中那个文件夹，就不会重复下载。",
+      whatInstalls: "安装内容", details: "详情",
+      licenseNote: "Qwen-Image-2.1 由阿里巴巴以 Qwen Research License（非商用）发布。本应用为 MIT 许可的非官方项目。",
+      install: (s) => `安装 · ${s}`, installing: "安装中…", retry: "重试安装", startApp: "开始创作",
+      toDownload: "待下载", free: "剩余", nothingToDownload: "无需下载",
+      noGpu: "未检测到 NVIDIA GPU", driver: "驱动",
+      stepUv: "uv（Python 管理器）", stepComfy: "ComfyUI 引擎", stepPython: "Python 3.12", stepDeps: "PyTorch CUDA 13 + 依赖包",
+      done: "完成", skipped: "已存在", waiting: "等待中", failed: "失败", verifying: "校验中",
+      modeText: "文本", modePhotos: "照片", modeSurprise: "随机惊喜",
+      hintText: "描述你想生成的图片", hintPhotos: "用一句话编辑或合成最多 10 张照片",
+      hintSurprise: "应用会自动构思完整创意，你只管点生成",
+      description: "描述", descPh: "黄昏侧逆光下的老渔民杂志风人像，85mm，真实皮肤质感…",
+      transparent: "透明背景",
+      references: "参考图", instruction: "指令",
+      refsHint: "第一张图是画布：结果会沿用它的构图。可用 <code>&lt;image1&gt;</code>、<code>&lt;image2&gt;</code>… 引用它们。",
+      instrPh: "把场景改成下雪的冬夜，保留人物、招牌和构图。",
+      qRemoveBg: "去除背景", qSnow: "雪夜", qWatercolor: "水彩", qGolden: "黄金时刻", qNoPeople: "去除人物", qCombine: "合成 1 + 2",
+      theme: "主题", optional: "（可选）", themePh: "猫、布宜诺斯艾利斯、科幻…",
+      surpriseHint: "每次都会生成不同的创意：主体、风格、光线、画幅…填了主题就当作起点",
+      lastIdea: "上次创意", editAsText: "转为文本编辑",
+      quality: "质量", pDraft: "草稿", pStandard: "标准", pMax: "最高",
+      presetLegend: "尺寸 · 步数 · RTX 3060 耗时",
+      format: "画幅", random: "随机", seed: "种子", lock: "锁定", seedPh: "随机",
+      cancel: "取消", kbd: "Ctrl + Enter 生成 · Esc 取消",
+      emptyTitle: "还没有图片", emptyText: "在左边选一个模式，然后点生成。图片会保存到",
+      close: "关闭", copyPrompt: "复制提示词", useSeed: "用这个种子", editThis: "编辑这张图", showInFolder: "在文件夹中显示", open: "打开",
+      history: "历史", historyEmpty: "生成的图片会显示在这里", dropHere: "拖入照片即可作为参考图",
+      add: "添加", dropOrClick: "拖入照片或点击选择",
+      gen: "生成", genSurprise: "随机惊喜", genEdit: "编辑照片", genWith: (n) => `用 ${n} 张照片生成`,
+      generating: "生成中…", engineOffBtn: "引擎已关闭", needPhoto: "至少添加一张照片",
+      needInstr: "写一句指令", needDesc: "写一段描述",
+      stUpload: "上传参考图", stLoad: "正在将模型加载到 GPU", stEncode: "读取提示词", stSample: "生成中",
+      stDecode: "解码图像", stSave: "保存中", firstSlow: "第一次会慢一些",
+      step: (v, m) => `第 ${v} / ${m} 步`, perStep: "秒/步", left: "剩余",
+      cancelled: "已取消生成", copied: "提示词已复制", copyFail: "复制失败",
+      limitRefs: (a, b, m) => `已添加 ${a} / ${b} 张：最多只能放 ${m} 张参考图`,
+      canvas: "画布", remove: "移除", rotate: "旋转 90°", refs: "参考",
+      eventsFail: "无法注册事件（请检查 capabilities/default.json）：",
+    },
   };
 
   const pick = () => {
@@ -124,7 +182,9 @@
       const saved = localStorage.getItem("qil.lang");
       if (saved && S[saved]) return saved;
     } catch { /* no storage */ }
-    return (navigator.language || "en").toLowerCase().startsWith("es") ? "es" : "en";
+    const l = (navigator.language || "en").toLowerCase();
+    if (l.startsWith("zh")) return "zh";
+    return l.startsWith("es") ? "es" : "en";
   };
   let lang = pick();
 
