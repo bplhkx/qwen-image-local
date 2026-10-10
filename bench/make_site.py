@@ -98,7 +98,7 @@ faq = [
     ("What AI image model runs on a 12 GB GPU?",
      "Qwen-Image-2.1 (7B, open weights, September 2026) runs fully in VRAM on a 12 GB card such as an RTX 3060 when you use the int8 weights and load the text encoder, the image model and the VAE one at a time. qwen-image-local does that for you: about 35 seconds for a 1024×1024 image and about 7 minutes at native 2K."),
     ("Can Qwen-Image-2.1 run on an 8 GB GPU?",
-     "Not verified yet. The compact profile swaps the text encoder for a 6.3 GB w4a8 version and cuts peak VRAM by about 2.5 GB at the same speed, so it should fit 10 GB cards. We could only emulate 8 GB with a soft cap, and peak usage still went above 8 GB, so treat 8 GB cards as untested."),
+     "Yes. The compact profile swaps the text encoder for a 6.3 GB w4a8 version and cuts peak VRAM by about 2.5 GB at the same speed. It is verified on a real 8 GB card: an RTX 5060 Laptop peaks at 7.2 GB (desktop included) and runs well."),
     ("Is Qwen-Image-2.1 as good as gpt-image-2?",
      f"For photo editing, yes in our tests: {tally['Photo editing']['tie']} ties and {tally['Photo editing']['qwen']} win out of 8 edits. For text-to-image, no: gpt-image-2 won {tally['Photography']['gpt'] + tally['Creativity']['gpt']} of 12, mostly on prompt adherence and world knowledge."),
     ("Is it free to use commercially?",
@@ -184,7 +184,7 @@ code{{font-family:ui-monospace,Consolas,monospace;font-size:13px}}footer{{margin
 <p class="lead" style="font-size:14px">Peak VRAM during a native 2K generation: 11.9 of 12.0 GB. Each model (text encoder 8.9 GB, image model 6.9 GB, VAE 0.6 GB) is loaded fully into VRAM when its stage runs; nothing is split between CPU and GPU.</p></div>
 </div>
 
-{"<h2>VRAM profiles</h2><p class=lead>Same prompts on the 12 GB card, then with ComfyUI told to leave 4.3 GB free (<code>--reserve-vram 4.3</code>). That cap is soft: peak usage (desktop included) still went above 8 GB with both profiles, so <b>this does not prove the app runs on a real 8 GB card</b>. What it does show: the compact profile lowers peak VRAM by about 2.5 GB at the same speed. Reproduce with <code>bash bench/tiers/run.sh</code>.</p><div class='box wrap'><table><thead><tr><th>Setup</th><th>Test</th><th>Total</th><th>s/step</th><th>Peak VRAM</th></tr></thead><tbody>" + tier_rows + "</tbody></table></div>" if tier_rows else ""}
+{"<h2>VRAM profiles</h2><p class=lead>Same prompts on the 12 GB card, then with ComfyUI told to leave 4.3 GB free (<code>--reserve-vram 4.3</code>). That cap is soft, so these numbers overstate what a real 8 GB card needs: the compact profile has since been verified on an <b>RTX 5060 Laptop 8 GB</b>, peaking at 7.2 GB (desktop included) at the same speed. Reproduce with <code>bash bench/tiers/run.sh</code>.</p><div class='box wrap'><table><thead><tr><th>Setup</th><th>Test</th><th>Total</th><th>s/step</th><th>Peak VRAM</th></tr></thead><tbody>" + tier_rows + "</tbody></table></div>" if tier_rows else ""}
 
 <h2>All 20 tests</h2>
 {"".join(cards)}

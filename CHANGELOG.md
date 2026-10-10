@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0 — 2026-10-10
+
+- **Compact profile verified on a real 8 GB card.** Tested on an RTX 5060 Laptop 8 GB: 7.2 GB peak VRAM (desktop included), runs well. The profile is no longer experimental; the app, CLI and docs now present 8 GB as the entry point.
+- **Uncensored DiT option.** Switch the image model to the third-party int8 convrot build from the setup screen or the main UI; the encoder and VAE are shared, so only one ~6.8 GB file is added.
+- **Simplified Chinese UI.** The app now ships in English, Spanish and Chinese, auto-picked from your system language.
+- **Config persists immediately.** Changing profile, DiT or models folder on the setup screen saves to disk at once, even if you never press install.
+- Reference photos: rotation and EXIF orientation are respected; `/history` polling until done makes long generations reliable.
+
 ## 0.1.0 — 2026-09-24
 
 First public release, four days after Qwen-Image-2.1 came out.

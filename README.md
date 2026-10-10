@@ -2,7 +2,9 @@
 
 <img src="assets/banner.jpg" alt="qwen-image-local — run Qwen-Image-2.1 text-to-image and photo editing on a 12 GB NVIDIA GPU. This banner was generated and then edited by the model on an RTX 3060." width="100%"/>
 
-**Type a prompt or drop up to 10 photos: Qwen-Image-2.1 renders it on your 12 GB GPU in about 35 s, and nothing leaves your PC.**
+**Language: English · [简体中文](README.zh-CN.md)**
+
+**Type a prompt or drop up to 10 photos: Qwen-Image-2.1 renders it on your 8 GB GPU in about 35 s, and nothing leaves your PC.**
 
 [![Status](https://img.shields.io/badge/status-beta-d29922?style=flat-square)](CHANGELOG.md)
 [![Windows](https://img.shields.io/badge/windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows&logoColor=white)](https://github.com/Mats2208/qwen-image-local/releases)
@@ -15,7 +17,7 @@
 
 <table>
 <tr>
-<td align="center"><strong>12 GB</strong><br/><sub>VRAM, every stage fully on GPU</sub></td>
+<td align="center"><strong>8 GB</strong><br/><sub>VRAM, every stage fully on GPU</sub></td>
 <td align="center"><strong>35 s</strong><br/><sub>per 1024² image, RTX 3060</sub></td>
 <td align="center"><strong>10</strong><br/><sub>reference photos per edit</sub></td>
 <td align="center"><strong>20</strong><br/><sub>tests vs gpt-image-2, all published</sub></td>
@@ -108,7 +110,7 @@ Two choices matter more than anything else:
 
 ## Install
 
-**Requirements:** Windows 10/11 · NVIDIA GPU with 12 GB (10 GB experimental, see below) · driver 580+ · ~25 GB free disk · 32 GB RAM (what it was tested with; 16 GB is untested).
+**Requirements:** Windows 10/11 · NVIDIA GPU with 8 GB (compact profile) or 12 GB (balanced profile) · driver 580+ · ~25 GB free disk · 32 GB RAM (what it was tested with; 16 GB is untested).
 
 ### Option A · Build it yourself (recommended, ~5 min)
 
@@ -132,7 +134,7 @@ Close and reopen the terminal afterwards so it picks up the new tools.
 
 ```powershell
 git clone https://github.com/Mats2208/qwen-image-local; cd qwen-image-local
-powershell -ExecutionPolicy Bypass -File .uild.ps1
+powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
 </td></tr>
@@ -148,7 +150,7 @@ pwsh -ExecutionPolicy Bypass -File ./build.ps1
 
 ```bat
 git clone https://github.com/Mats2208/qwen-image-local && cd qwen-image-local
-.uild.cmd
+.\build.cmd
 ```
 
 </td></tr>
@@ -212,9 +214,9 @@ Pass `--keep-engine` to leave the engine running between calls so each one skips
 | Profile | Text encoder | Peak VRAM (desktop included) | 1024², 20 steps | Status |
 |---|---|---:|---:|---|
 | **Balanced** | int8, 8.9 GB | 11.4 GB | 32 s | Tested on RTX 3060 12 GB |
-| **Compact** | w4a8, 6.3 GB | 8.9 GB | 33 s | Experimental: should fit 10 GB cards |
+| **Compact** | w4a8, 6.3 GB | 7.2 GB | 33 s | Tested on RTX 5060 Laptop 8 GB |
 
-The compact profile cuts peak VRAM by about 2.5 GB at the same speed. **8 GB cards are untested:** the only way to emulate one here was ComfyUI's soft `--reserve-vram` cap, and peak usage still went above 8 GB. If you have an 8 or 10 GB card, a `qil bench` run on [bench/tiers](bench/tiers) would be the most useful contribution to this repo.
+The compact profile cuts peak VRAM by about 2.5 GB at the same speed and is verified to run on a real 8 GB card (RTX 5060 Laptop, 7.2 GB peak with the desktop included). If you have a 10 or 16 GB card, a `qil bench` run on [bench/tiers](bench/tiers) would still be a useful contribution to this repo.
 
 ## What it doesn't do (yet)
 
@@ -250,7 +252,7 @@ This exists because a 12 GB card deserved better than "buy a 4090". If it ran on
 
 - **⭐ [Star the repo](https://github.com/Mats2208/qwen-image-local/stargazers).** It is the single thing that makes GitHub and search engines show it to the next person with a small GPU.
 - **Share it** where people ask "what can I run on my card?": [r/StableDiffusion](https://www.reddit.com/r/StableDiffusion/), [r/LocalLLaMA](https://www.reddit.com/r/LocalLLaMA/), [X / Twitter](https://twitter.com/intent/tweet?text=Qwen-Image-2.1%20running%20fully%20in%20VRAM%20on%20a%2012%20GB%20GPU%2C%20desktop%20app%20%2B%20honest%20benchmark%20vs%20gpt-image-2&url=https%3A%2F%2Fgithub.com%2FMats2208%2Fqwen-image-local), your Discord.
-- **Post your numbers.** Own an 8, 10 or 16 GB card? Run `bash bench/tiers/run.sh` and open an issue with `results.json`. Real 8 GB results are the most wanted data point here.
+- **Post your numbers.** Own a 10 or 16 GB card? Run `bash bench/tiers/run.sh` and open an issue with `results.json`.
 
 ## Credits
 

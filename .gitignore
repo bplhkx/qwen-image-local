@@ -6,3 +6,4 @@ assets/banner-candidates/
 bench/tiers/results/*/*
 !bench/tiers/results/*/results.json
 *.log
+/out/

@@ -137,8 +137,8 @@ pub enum Profile {
     /// 12 GB+: int8 encoder (8.9 GB resident). Tested on an RTX 3060 12 GB.
     #[default]
     Balanced,
-    /// ~10 GB: w4a8 encoder (6.3 GB). Cuts peak VRAM by ~2.5 GB at the same speed.
-    /// Experimental: not yet tested on a real 8 GB card.
+    /// 8 GB+: w4a8 encoder (6.3 GB). Cuts peak VRAM by ~2.5 GB at the same speed.
+    /// Tested on an RTX 5060 Laptop 8 GB (peak 7.2 GB, desktop included).
     Compact,
 }
 
@@ -159,7 +159,7 @@ impl Profile {
     pub fn label(self) -> &'static str {
         match self {
             Profile::Balanced => "12 GB+ (int8 encoder)",
-            Profile::Compact => "10 GB, experimental; 8 GB untested (w4a8 encoder)",
+            Profile::Compact => "8 GB+ (w4a8 encoder)",
         }
     }
     /// Pick a profile from total VRAM in MB.

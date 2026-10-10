@@ -24,7 +24,7 @@ enum Cmd {
     Doctor,
     /// Install the runtime and download the weights (~17 GB, resumable)
     Setup {
-        /// balanced (12 GB+) or compact (~10 GB, experimental). Default: picked from your VRAM
+        /// balanced (12 GB+) or compact (8 GB+). Default: picked from your VRAM
         #[arg(long)]
         profile: Option<String>,
         /// official (Comfy-Org) or uncensored (third-party int8 convrot DiT). Default: official
