@@ -59,6 +59,8 @@ fn setup_configure(settings: State<'_, Settings>, profile: Profile, dit: Option<
     if let Some(d) = models_dir.filter(|d| !d.trim().is_empty()) {
         c.models_dir = PathBuf::from(d);
     }
+    // Persist immediately so the choice survives a restart; setup::run saves again at the end.
+    c.save().map_err(|e| e.to_string())?;
     Ok(c.clone())
 }
 
