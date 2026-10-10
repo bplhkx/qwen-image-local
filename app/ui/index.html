@@ -10,7 +10,7 @@
   <header class="topbar">
     <div class="brand">
       <strong>Qwen Image Local</strong>
-      <span class="mono">qwen-image-2.1 · <span id="profileTag">int8</span></span>
+      <span class="mono">qwen-image-2.1 · <span id="profileTag">int8</span> · <span id="ditTag">official</span></span>
     </div>
     <div class="status">
       <div class="stat" id="engineStat" hidden>
@@ -58,6 +58,21 @@
                 <span class="p-meta mono" data-i18n="profCompactMeta"></span>
               </button>
             </div>
+          </div>
+
+          <div class="group">
+            <span class="label" data-i18n="genModel"></span>
+            <div class="presets" id="dits" role="radiogroup">
+              <button type="button" role="radio" data-dit="official" aria-checked="true">
+                <span class="p-name" data-i18n="ditOfficial"></span>
+                <span class="p-meta mono" data-i18n="ditOfficialMeta"></span>
+              </button>
+              <button type="button" role="radio" data-dit="uncensored" aria-checked="false">
+                <span class="p-name" data-i18n="ditUncensored"></span>
+                <span class="p-meta mono" data-i18n="ditUncensoredMeta"></span>
+              </button>
+            </div>
+            <p class="hint" data-i18n="ditHint"></p>
           </div>
 
           <div class="group">
@@ -130,6 +145,21 @@
             <div class="label-row"><span class="label" data-i18n="lastIdea"></span><button type="button" class="btn btn-xs" id="ideaToText" data-i18n="editAsText"></button></div>
             <p id="ideaTxt"></p>
           </div>
+        </section>
+
+        <section class="group">
+          <span class="label" data-i18n="genModel"></span>
+          <div class="presets" id="ditsMain" role="radiogroup">
+            <button type="button" role="radio" data-dit="official" aria-checked="true">
+              <span class="p-name" data-i18n="ditOfficial"></span>
+              <span class="p-meta mono" data-i18n="ditOfficialMeta"></span>
+            </button>
+            <button type="button" role="radio" data-dit="uncensored" aria-checked="false">
+              <span class="p-name" data-i18n="ditUncensored"></span>
+              <span class="p-meta mono" data-i18n="ditUncensoredMeta"></span>
+            </button>
+          </div>
+          <p class="hint" id="ditMainHint" data-i18n="ditMainHint"></p>
         </section>
 
         <section class="group">

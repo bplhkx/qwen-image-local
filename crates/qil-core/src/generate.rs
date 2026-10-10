@@ -9,7 +9,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::config::{Config, DIT, VAE};
+use crate::config::{Config, VAE};
 
 pub const MAX_REFS: usize = 10;
 
@@ -102,9 +102,9 @@ pub fn wrap_transparent(p: &str) -> String {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn build_graph(prompt: &str, refs: &[String], w: u32, h: u32, steps: u32, seed: u64, edit_res: u32, encoder: &str) -> Value {
+pub fn build_graph(prompt: &str, refs: &[String], w: u32, h: u32, steps: u32, seed: u64, edit_res: u32, encoder: &str, dit: &str) -> Value {
     let mut g = json!({
-        "unet": {"class_type": "UNETLoader", "inputs": {"unet_name": DIT.name, "weight_dtype": "default"}},
+        "unet": {"class_type": "UNETLoader", "inputs": {"unet_name": dit, "weight_dtype": "default"}},
         "clip": {"class_type": "CLIPLoader", "inputs": {"clip_name": encoder, "type": "qwen_image", "device": "default"}},
         "vae": {"class_type": "VAELoader", "inputs": {"vae_name": VAE.name}},
         "enc": {"class_type": "TextEncodeQwenImage21", "inputs": {
@@ -198,7 +198,8 @@ pub async fn run(
     let prompt = if req.transparent && refs.is_empty() { wrap_transparent(&req.prompt) } else { req.prompt.clone() };
     let (w, h) = dims(&req.aspect, p.megapixels);
     let seed = req.seed.unwrap_or_else(|| rand::thread_rng().gen_range(0..(1u64 << 48)));
-    let graph = build_graph(&prompt, &refs, w, h, p.steps, seed, p.edit_res, cfg.profile.encoder().name);
+    let dit_name = cfg.dit.model().name;
+    let graph = build_graph(&prompt, &refs, w, h, p.steps, seed, p.edit_res, cfg.profile.encoder().name, dit_name);
 
     // Open the WebSocket before queueing so the first events are not lost.
     let client_id = format!("qil-{tag}");
@@ -338,7 +339,7 @@ pub async fn run(
         "prompt": req.prompt, "mode": req.mode, "preset": req.preset, "aspect": req.aspect,
         "seed": seed, "steps": p.steps, "width": width, "height": height, "transparent": req.transparent,
         "references": req.images, "seconds": round1(result.seconds), "sampleSeconds": round1(sample_secs),
-        "model": "Qwen-Image-2.1", "dit": DIT.name, "encoder": cfg.profile.encoder().name,
+        "model": "Qwen-Image-2.1", "dit": cfg.dit.model().name, "encoder": cfg.profile.encoder().name,
         "app": concat!("qwen-image-local ", env!("CARGO_PKG_VERSION")),
         "created": chrono::Local::now().to_rfc3339(),
     });
@@ -368,10 +369,11 @@ mod tests {
     #[test]
     fn edit_graph_wires_all_refs() {
         let refs: Vec<String> = (1..=3).map(|i| format!("r{i}.png")).collect();
-        let g = build_graph("x", &refs, 0, 0, 20, 1, 1024, "enc.safetensors");
+        let g = build_graph("x", &refs, 0, 0, 20, 1, 1024, "enc.safetensors", "dit.safetensors");
         assert_eq!(g["enc"]["inputs"]["images.image_3"], json!(["load3", 0]));
         assert_eq!(g["sampler"]["inputs"]["latent_image"], json!(["enc", 2]));
         assert_eq!(g["clip"]["inputs"]["clip_name"], json!("enc.safetensors"));
+        assert_eq!(g["unet"]["inputs"]["unet_name"], json!("dit.safetensors"));
         assert!(g.get("latent").is_none());
     }
 

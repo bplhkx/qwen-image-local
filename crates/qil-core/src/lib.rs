@@ -11,6 +11,6 @@ pub mod gpu;
 pub mod setup;
 pub mod surprise;
 
-pub use config::{Config, Profile};
+pub use config::{Config, Dit, Profile};
 pub use engine::{Engine, EngineState};
 pub use generate::{GenRequest, GenResult, Progress};

@@ -14,7 +14,7 @@ use std::process::{Command, Stdio};
 
 use serde::Serialize;
 
-use crate::config::{Config, COMFY_COMMIT, MIN_DRIVER_MAJOR, TORCH_INDEX, UV_VERSION};
+use crate::config::{Config, Dit, COMFY_COMMIT, MIN_DRIVER_MAJOR, TORCH_INDEX, UV_VERSION};
 use crate::download::{self, human_bytes};
 use crate::gpu::{self, no_window};
 
@@ -37,6 +37,8 @@ pub struct Status {
     pub problems: Vec<String>,
     pub download_bytes: u64,
     pub free_bytes: Option<u64>,
+    /// Whether the weights of each DiT are already downloaded (dit id -> ready).
+    pub dit_ready: std::collections::BTreeMap<String, bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -84,7 +86,7 @@ pub fn status(cfg: &Config) -> Status {
             _ => 3_400 << 20, // torch cu130 + deps
         };
     }
-    for m in cfg.profile.models() {
+    for m in cfg.models() {
         let done = model_ready(cfg, &m);
         let have = m.path(&cfg.models_dir).with_extension("safetensors.part").metadata().map(|x| x.len()).unwrap_or(0);
         steps.push(Step {
@@ -109,6 +111,10 @@ pub fn status(cfg: &Config) -> Status {
         )),
         _ => {}
     }
+    let dit_ready = Dit::all()
+        .iter()
+        .map(|d| (d.id().to_string(), model_ready(cfg, &d.model())))
+        .collect::<std::collections::BTreeMap<_, _>>();
     let download_bytes = steps.iter().map(|s| s.download_bytes).sum();
     let free_bytes = free_space(&cfg.models_dir);
     if let Some(free) = free_bytes {
@@ -121,7 +127,7 @@ pub fn status(cfg: &Config) -> Status {
             ));
         }
     }
-    Status { ready: steps.iter().all(|s| s.done), steps, gpu, problems, download_bytes, free_bytes }
+    Status { ready: steps.iter().all(|s| s.done), steps, gpu, problems, download_bytes, free_bytes, dit_ready }
 }
 
 /// Runs a process and forwards each output line as a Log event.
@@ -248,7 +254,7 @@ pub fn run(cfg: &Config, emit: &mut dyn FnMut(Event)) -> Result<(), String> {
     }
 
     // 5. Weights
-    for m in cfg.profile.models() {
+    for m in cfg.models() {
         let id = format!("model:{}", m.name);
         let dest = m.path(&cfg.models_dir);
         if model_ready(cfg, &m) {

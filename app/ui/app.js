@@ -45,6 +45,37 @@
   // ═════════ Setup (first run) ═════════
 
   const STEP_LABEL = { uv: "stepUv", comfy: "stepComfy", python: "stepPython", deps: "stepDeps" };
+  const DIT_LABEL = { official: "ditOfficial", uncensored: "ditUncensored" };
+
+  function ditReady(id) { return state.setup?.status?.ditReady?.[id] === true; }
+  function ditBadge(btn, ready) {
+    const name = btn.querySelector(".p-name");
+    let b = name.querySelector(".p-badge");
+    if (!b) { b = document.createElement("span"); b.className = "p-badge"; name.appendChild(b); }
+    b.textContent = ready ? t("ditInstalled") : t("ditMissing");
+    b.classList.toggle("missing", !ready);
+  }
+  function renderDitGroup(rootId) {
+    const cur = state.setup?.config.dit || "official";
+    document.querySelectorAll(`#${rootId} [data-dit]`).forEach((btn) => {
+      btn.setAttribute("aria-checked", String(btn.dataset.dit === cur));
+      ditBadge(btn, ditReady(btn.dataset.dit));
+    });
+  }
+  function renderDitTags() {
+    $("ditTag").textContent = state.setup?.config.dit || "official";
+  }
+  function renderDitMain() {
+    const cur = state.setup?.config.dit || "official";
+    document.querySelectorAll("#ditsMain [data-dit]").forEach((btn) => {
+      btn.setAttribute("aria-checked", String(btn.dataset.dit === cur));
+      ditBadge(btn, ditReady(btn.dataset.dit));
+    });
+  }
+  function backToSetup() {
+    $("mainView").hidden = true;
+    $("setupView").hidden = false;
+  }
 
   async function loadSetup() {
     state.setup = await invoke("setup_status");
@@ -65,6 +96,8 @@
 
     document.querySelectorAll("#profiles [data-profile]").forEach((b) =>
       b.setAttribute("aria-checked", String(b.dataset.profile === s.config.profile)));
+    renderDitGroup("dits");
+    renderDitTags();
     document.querySelectorAll("[data-rec]").forEach((el) => { el.hidden = el.dataset.rec !== s.recommended; });
     $("modelsDir").textContent = s.config.modelsDir;
     $("modelsDir").title = s.config.modelsDir;
@@ -102,18 +135,23 @@
     if (state.installing) { btn.textContent = t("installing"); btn.disabled = true; }
     else if (s.status.ready) { btn.textContent = t("startApp"); btn.disabled = false; }
     else { btn.textContent = state.failed ? t("retry") : t("install", dl ? fmtBytes(dl) : "0 MB"); btn.disabled = blocked; }
-    document.querySelectorAll("#profiles button, #modelsPick").forEach((b) => { b.disabled = state.installing; });
+    document.querySelectorAll("#profiles button, #dits button, #modelsPick").forEach((b) => { b.disabled = state.installing; });
   }
 
   document.querySelectorAll("#profiles [data-profile]").forEach((b) =>
     b.addEventListener("click", async () => {
-      await invoke("setup_configure", { profile: b.dataset.profile, modelsDir: null });
+      await invoke("setup_configure", { profile: b.dataset.profile, dit: null, modelsDir: null });
+      loadSetup();
+    }));
+  document.querySelectorAll("#dits [data-dit]").forEach((b) =>
+    b.addEventListener("click", async () => {
+      await invoke("setup_configure", { profile: state.setup.config.profile, dit: b.dataset.dit, modelsDir: null });
       loadSetup();
     }));
   $("modelsPick").addEventListener("click", async () => {
     const dir = await invoke("pick_folder");
     if (!dir) return;
-    await invoke("setup_configure", { profile: state.setup.config.profile, modelsDir: dir });
+    await invoke("setup_configure", { profile: state.setup.config.profile, dit: null, modelsDir: dir });
     loadSetup();
   });
   $("installBtn").addEventListener("click", async () => {
@@ -176,6 +214,8 @@
     ["engineStat", "engineBtn", "folderBtn"].forEach((id) => { $(id).hidden = false; });
     const p = state.setup?.config.profile === "compact" ? "w4a8" : "int8";
     $("profileTag").textContent = p;
+    renderDitTags();
+    renderDitMain();
     invoke("output_dir").then((d) => { $("outDirTxt").textContent = d; }).catch(() => {});
     loadHistory();
     startEngine();
@@ -205,6 +245,26 @@
   }
   document.querySelectorAll("#presets [data-preset]").forEach((b) =>
     b.addEventListener("click", () => { state.preset = b.dataset.preset; localSet("preset", state.preset); renderPresets(); updateGenButton(); }));
+
+  // Generation model (main view): switching to a model whose weights are missing
+  // only warns and sends the user back to the installer — it never downloads on its own.
+  document.querySelectorAll("#ditsMain [data-dit]").forEach((b) =>
+    b.addEventListener("click", async () => {
+      const id = b.dataset.dit;
+      if (id === (state.setup?.config.dit || "official")) return;
+      if (!ditReady(id)) {
+        notify(t("ditNeedInstall", t(DIT_LABEL[id])));
+        await invoke("setup_configure", { profile: state.setup.config.profile, dit: id, modelsDir: null });
+        await loadSetup();
+        backToSetup();
+        return;
+      }
+      await invoke("setup_configure", { profile: state.setup.config.profile, dit: id, modelsDir: null });
+      await loadSetup();
+      renderDitTags();
+      renderDitMain();
+      notify(t("ditSwitched", t(DIT_LABEL[id])), true);
+    }));
 
   // Format
   function renderAspects() {
@@ -545,6 +605,8 @@
     renderHistory();
     renderEngine();
     renderSetup();
+    renderDitTags();
+    renderDitMain();
     if (state.current) showImage(state.current);
   });
 

@@ -16,18 +16,29 @@ pub const TORCH_INDEX: &str = "https://download.pytorch.org/whl/cu130";
 /// CUDA 13.0 wheels need an R580+ driver.
 pub const MIN_DRIVER_MAJOR: u32 = 580;
 pub const HF_BASE: &str = "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main";
+/// Alternative DiT release: uncensored int8 convrot weights hosted in a different repo.
+pub const HF_BASE_UC: &str = "https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF/resolve/main";
 
 #[derive(Debug, Clone, Copy)]
 pub struct ModelFile {
-    pub folder: &'static str, // ComfyUI model folder
+    pub folder: &'static str, // ComfyUI model folder (local storage)
     pub name: &'static str,
     pub size: u64,
     pub sha256: &'static str,
+    /// Override the download base URL (defaults to `HF_BASE`).
+    pub base: Option<&'static str>,
+    /// Override the path within the repo (defaults to `{folder}/{name}`).
+    /// Needed when the file lives at the repo root instead of a subfolder.
+    pub remote: Option<&'static str>,
 }
 
 impl ModelFile {
     pub fn url(&self) -> String {
-        format!("{HF_BASE}/{}/{}", self.folder, self.name)
+        let base = self.base.unwrap_or(HF_BASE);
+        match self.remote {
+            Some(r) => format!("{base}/{r}"),
+            None => format!("{base}/{}/{}", self.folder, self.name),
+        }
     }
     pub fn path(&self, models_dir: &Path) -> PathBuf {
         models_dir.join(self.folder).join(self.name)
@@ -39,25 +50,85 @@ pub const DIT: ModelFile = ModelFile {
     name: "qwen_image_2.1_int8_convrot.safetensors",
     size: 7_256_783_064,
     sha256: "cb74113cb03faecd79611b01fd7fd642f0aa60d6f0b95086abee214d75eaa57d",
+    base: None,
+    remote: None,
+};
+/// Uncensored DiT, same int8 convrot format, hosted at the repo root of a third-party release.
+pub const DIT_UC: ModelFile = ModelFile {
+    folder: "diffusion_models",
+    name: "qwen-image-2.1-UC-int8_convrot.safetensors",
+    size: 7_256_796_840,
+    sha256: "5bc5a6c007eff1e0d4004344a24c4af966b9d2c83d142e613b0d456ccceb19ae",
+    base: Some(HF_BASE_UC),
+    remote: Some("qwen-image-2.1-UC-int8_convrot.safetensors"),
 };
 pub const TE_INT8: ModelFile = ModelFile {
     folder: "text_encoders",
     name: "qwen3vl_8b_int8_convrot.safetensors",
     size: 9_350_798_360,
     sha256: "8bfd0f6e12abf2d2d697ecc888e5e90b0d6741d6708f05799f53afa560452e8f",
+    base: None,
+    remote: None,
 };
 pub const TE_W4A8: ModelFile = ModelFile {
     folder: "text_encoders",
     name: "qwen3vl_8b_w4a8.safetensors",
     size: 6_312_105_364,
     sha256: "7754425e55e7bea2bfde4dde59a4cc236cb44e5ee9c215ea66ef8d47012824eb",
+    base: None,
+    remote: None,
 };
 pub const VAE: ModelFile = ModelFile {
     folder: "vae",
     name: "qwen_image_2.1_vae_bf16.safetensors",
     size: 675_509_688,
     sha256: "bb21f7473051e1ac368515dd3f2e15cd44d7a11748ee8823e1ddca3e4876b7c9",
+    base: None,
+    remote: None,
 };
+
+/// Which image-generation model (DiT) to load. The encoder and VAE are shared.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Dit {
+    /// Official Comfy-Org Qwen-Image-2.1 int8 convrot weights.
+    #[default]
+    Official,
+    /// Third-party uncensored int8 convrot weights (abenzerps release).
+    Uncensored,
+}
+
+impl Dit {
+    /// Stable id used in the UI and config JSON.
+    pub fn id(self) -> &'static str {
+        match self {
+            Dit::Official => "official",
+            Dit::Uncensored => "uncensored",
+        }
+    }
+    pub fn all() -> [Dit; 2] {
+        [Dit::Official, Dit::Uncensored]
+    }
+    pub fn model(self) -> ModelFile {
+        match self {
+            Dit::Official => DIT,
+            Dit::Uncensored => DIT_UC,
+        }
+    }
+    pub fn label(self) -> &'static str {
+        match self {
+            Dit::Official => "Qwen-Image-2.1 (official)",
+            Dit::Uncensored => "Qwen-Image-2.1 Uncensored",
+        }
+    }
+    pub fn parse(s: &str) -> Option<Dit> {
+        match s.to_ascii_lowercase().as_str() {
+            "official" | "default" | "qwen" => Some(Dit::Official),
+            "uncensored" | "uc" => Some(Dit::Uncensored),
+            _ => None,
+        }
+    }
+}
 
 /// Which text encoder to use. The DiT and VAE are the same for every profile.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -80,6 +151,10 @@ impl Profile {
     }
     pub fn models(self) -> [ModelFile; 3] {
         [DIT, self.encoder(), VAE]
+    }
+    /// Models for this profile with a specific DiT (the encoder and VAE stay the same).
+    pub fn models_with(self, dit: Dit) -> [ModelFile; 3] {
+        [dit.model(), self.encoder(), VAE]
     }
     pub fn label(self) -> &'static str {
         match self {
@@ -107,6 +182,9 @@ pub struct Config {
     pub models_dir: PathBuf,
     #[serde(default)]
     pub profile: Profile,
+    /// Which DiT (image model) to load.
+    #[serde(default)]
+    pub dit: Dit,
     /// Where generated images go.
     pub output_dir: PathBuf,
     #[serde(default = "default_port")]
@@ -132,6 +210,7 @@ impl Default for Config {
             models_dir: runtime_dir.join("models"),
             runtime_dir,
             profile: Profile::default(),
+            dit: Dit::default(),
             output_dir: dirs::picture_dir()
                 .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("Pictures"))
                 .join("Qwen Image Local"),
@@ -168,6 +247,10 @@ impl Config {
         std::fs::write(p, serde_json::to_vec_pretty(self).expect("config serializes"))
     }
 
+    /// The three weights this config needs: selected DiT + profile encoder + VAE.
+    pub fn models(&self) -> [ModelFile; 3] {
+        self.profile.models_with(self.dit)
+    }
     pub fn comfy_dir(&self) -> PathBuf {
         self.runtime_dir.join("ComfyUI")
     }
@@ -210,5 +293,29 @@ mod tests {
     fn model_urls() {
         assert!(DIT.url().ends_with("/diffusion_models/qwen_image_2.1_int8_convrot.safetensors"));
         assert_eq!(Profile::Compact.encoder().name, "qwen3vl_8b_w4a8.safetensors");
+    }
+
+    #[test]
+    fn uncensored_dit_url_and_path() {
+        assert_eq!(
+            DIT_UC.url(),
+            "https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF/resolve/main/qwen-image-2.1-UC-int8_convrot.safetensors"
+        );
+        // Remote lives at the repo root, but is stored in the local diffusion_models folder.
+        assert_eq!(DIT_UC.name, "qwen-image-2.1-UC-int8_convrot.safetensors");
+        assert!(DIT_UC.path(std::path::Path::new("/m")).ends_with("diffusion_models/qwen-image-2.1-UC-int8_convrot.safetensors"));
+        assert_eq!(Dit::Uncensored.model().name, DIT_UC.name);
+        assert_eq!(Dit::parse("uc"), Some(Dit::Uncensored));
+    }
+
+    #[test]
+    fn config_models_follow_dit() {
+        let mut c = Config::default();
+        assert_eq!(c.models()[0].name, DIT.name);
+        c.dit = Dit::Uncensored;
+        assert_eq!(c.models()[0].name, DIT_UC.name);
+        // encoder + vae unchanged
+        assert_eq!(c.models()[1].name, TE_INT8.name);
+        assert_eq!(c.models()[2].name, VAE.name);
     }
 }

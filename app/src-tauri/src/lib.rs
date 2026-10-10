@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLock;
 
 use base64::Engine as _;
-use qil_core::{engine, generate, gpu, setup, surprise, Config, Engine, EngineState, GenRequest, GenResult, Profile};
+use qil_core::{engine, generate, gpu, setup, surprise, Config, Dit, Engine, EngineState, GenRequest, GenResult, Profile};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, RunEvent, State};
 use tauri_plugin_dialog::DialogExt;
@@ -50,9 +50,12 @@ async fn setup_status(settings: State<'_, Settings>) -> Result<SetupInfo, String
 }
 
 #[tauri::command]
-fn setup_configure(settings: State<'_, Settings>, profile: Profile, models_dir: Option<String>) -> Result<Config, String> {
+fn setup_configure(settings: State<'_, Settings>, profile: Profile, dit: Option<Dit>, models_dir: Option<String>) -> Result<Config, String> {
     let mut c = settings.0.write().unwrap();
     c.profile = profile;
+    if let Some(d) = dit {
+        c.dit = d;
+    }
     if let Some(d) = models_dir.filter(|d| !d.trim().is_empty()) {
         c.models_dir = PathBuf::from(d);
     }
