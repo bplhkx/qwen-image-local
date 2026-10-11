@@ -61,8 +61,11 @@ Qwen-Image-2.1 发布于 2026 年 9 月 20 日。它是第一个既**好用**又
 | | 功能 | 说明 |
 |---|---|---|
 | **创作** | 文生图 | 草稿 1024² · 标准 1.6 MP · 最高原生 2K，七种画幅，可锁定种子 |
+| **速度** | Turbo 档位 | 蒸馏出的 8 步权重，采样快约 3–4 倍；可与任意显存档位叠加选择 |
+| **模型** | 官方 / 无审查 | 在安装界面或主界面切换图像模型；编码器和 VAE 通用，只需换一个文件 |
 | **透明** | 原生 RGBA | 真实 alpha 通道由模型直接产出，不靠抠图去背景那套 |
 | **编辑** | 1–10 张参考图 | 重打光、改风格、移除物体或人物、重写招牌、合成主体；第一张图是画布 |
+| **标注** | 图片编辑器 | 参考图送进模型前可以先画、圈、框、加箭头、擦除或裁剪；支持撤销、缩放和 90° 旋转 |
 | **随机惊喜** | 创意生成器 | 风格 × 主体 × 地点 × 光线，或一个精选创意；可填主题 |
 | **安装** | 一条命令构建 + 一次性安装 | 锁定版本的 ComfyUI、Python 3.12、PyTorch CUDA 13、权重支持断点续传与 SHA-256 校验 |
 | **命令行** | `qil` | `doctor` · `setup` · `generate` · `edit` · `surprise` · `bench` · `config` |
@@ -187,6 +190,7 @@ git clone https://github.com/Mats2208/qwen-image-local && cd qwen-image-local
 > qil doctor
 GPU        RTX 3060 · 12.0 GB VRAM · driver 610.88 (ok)
 profile    balanced (12 GB+ (int8 encoder))
+speed      base (Standard (20–40 steps))
   [x] uv 0.12.18 (Python manager)
   [x] ComfyUI engine
   [x] Python 3.12
@@ -199,6 +203,7 @@ Ready. Try: qil generate "a red fox asleep in the snow" --preset draft
 
 ```bash
 qil setup                                             # 安装；档位按你的显存自动选
+qil config --speed turbo                              # 任意显存档位上都可以叠加 8 步蒸馏采样
 qil generate "一只在雪里睡着的红狐" --preset draft
 qil generate "马黛茶壶贴纸" --transparent --aspect 1:1
 qil edit "把场景改成下雪的冬夜" -i street.jpg --preset standard

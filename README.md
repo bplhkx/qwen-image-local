@@ -61,8 +61,11 @@ Qwen-Image-2.1 came out on September 20, 2026. It is the first open-weight image
 | | Feature | Details |
 |---|---|---|
 | **Create** | Text → image | Draft 1024² · Standard 1.6 MP · Max native 2K, seven aspect ratios, lockable seed |
+| **Speed** | Turbo tier | Distilled 8-step checkpoint, about 3–4× faster sampling; pick it on top of any VRAM profile |
+| **Model** | Official or Uncensored | Swap the image model from the setup screen or the main UI; the encoder and VAE are shared, so it is one file |
 | **Transparency** | Native RGBA | Real alpha channel from the model, no background-removal tricks |
 | **Edit** | 1–10 reference photos | Relight, restyle, remove objects or people, rewrite signs, combine subjects; the first photo is the canvas |
+| **Annotate** | Markup editor | Draw, circle, box, arrow, erase or crop a reference photo before it goes in; undo, zoom and 90° rotation included |
 | **Surprise me** | Idea generator | Style × subject × place × light, or a curated idea; optional theme |
 | **Setup** | One-command build + one-time install | Pinned ComfyUI, Python 3.12, PyTorch CUDA 13, weights with resume and SHA-256 checks |
 | **CLI** | `qil` | `doctor` · `setup` · `generate` · `edit` · `surprise` · `bench` · `config` |
@@ -187,6 +190,7 @@ Either way, everything lives in `%LOCALAPPDATA%\qwen-image-local` (models can go
 > qil doctor
 GPU        RTX 3060 · 12.0 GB VRAM · driver 610.88 (ok)
 profile    balanced (12 GB+ (int8 encoder))
+speed      base (Standard (20–40 steps))
   [x] uv 0.12.18 (Python manager)
   [x] ComfyUI engine
   [x] Python 3.12
@@ -199,6 +203,7 @@ Ready. Try: qil generate "a red fox asleep in the snow" --preset draft
 
 ```bash
 qil setup                                             # install; profile picked from your VRAM
+qil config --speed turbo                              # distilled 8-step sampling on top of any profile
 qil generate "a red fox asleep in the snow" --preset draft
 qil generate "a mate gourd sticker" --transparent --aspect 1:1
 qil edit "Change the scene to a snowy night" -i street.jpg --preset standard

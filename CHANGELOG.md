@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0 — 2026-10-11
+
+- **Turbo speed tier.** Pick the distilled 8-step checkpoint instead of the 20–40-step standard one: about 3–4× faster sampling. It is orthogonal to the VRAM profile and the DiT choice, so you can run Turbo on Balanced or Compact; the Uncensored model doesn't have Turbo weights yet and falls back to the standard checkpoint. Selectable in the app (setup screen and main UI) and in the CLI (`qil setup --speed turbo`, `qil config --speed turbo`).
+- **Markup editor for reference photos.** Draw, circle, box, arrow, erase or crop a photo before it goes into the model, with a 9-color palette plus custom colors, three brush widths, undo/redo (40 steps), whole-image 90° rotation and Ctrl+wheel zoom. Replaces the old rotate-only button. Edits are saved as new PNGs — your original files are never touched.
+- **Click to zoom.** Reference photos and the main result open a full-size preview; clicking a reference shows the original file, not the 240 px thumbnail.
+- Config now persists the speed choice the moment you pick it, like the other setup options.
+
 ## 0.2.0 — 2026-10-10
 
 - **Compact profile verified on a real 8 GB card.** Tested on an RTX 5060 Laptop 8 GB: 7.2 GB peak VRAM (desktop included), runs well. The profile is no longer experimental; the app, CLI and docs now present 8 GB as the entry point.
