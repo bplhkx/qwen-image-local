@@ -14,7 +14,7 @@ use std::process::{Command, Stdio};
 
 use serde::Serialize;
 
-use crate::config::{Config, Dit, COMFY_COMMIT, MIN_DRIVER_MAJOR, TORCH_INDEX, UV_VERSION};
+use crate::config::{Config, Dit, Speed, COMFY_COMMIT, MIN_DRIVER_MAJOR, TORCH_INDEX, UV_VERSION};
 use crate::download::{self, human_bytes};
 use crate::gpu::{self, no_window};
 
@@ -111,9 +111,12 @@ pub fn status(cfg: &Config) -> Status {
         )),
         _ => {}
     }
+    // Readiness per (dit:speed) combination that has published weights. Combinations with no
+    // weights (uncensored + turbo) are omitted so the UI can distinguish "unsupported" from "not downloaded".
     let dit_ready = Dit::all()
-        .iter()
-        .map(|d| (d.id().to_string(), model_ready(cfg, &d.model())))
+        .into_iter()
+        .flat_map(|d| Speed::all().into_iter().map(move |s| (d, s)))
+        .filter_map(|(d, s)| d.model_for(s).map(|m| (format!("{}:{}", d.id(), s.id()), model_ready(cfg, &m))))
         .collect::<std::collections::BTreeMap<_, _>>();
     let download_bytes = steps.iter().map(|s| s.download_bytes).sum();
     let free_bytes = free_space(&cfg.models_dir);

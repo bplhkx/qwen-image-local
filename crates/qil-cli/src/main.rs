@@ -8,7 +8,7 @@ use std::time::Duration;
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
 use qil_core::download::human_bytes;
-use qil_core::{config, generate, gpu, setup, surprise, Config, Dit, Engine, GenRequest, Profile};
+use qil_core::{config, generate, gpu, setup, surprise, Config, Dit, Engine, GenRequest, Profile, Speed};
 use serde_json::{json, Value};
 
 #[derive(Parser)]
@@ -30,6 +30,9 @@ enum Cmd {
         /// official (Comfy-Org) or uncensored (third-party int8 convrot DiT). Default: official
         #[arg(long)]
         dit: Option<String>,
+        /// base (20-40 steps) or turbo (distilled 8 steps). Default: base
+        #[arg(long)]
+        speed: Option<String>,
         /// Where to put the models (another disk is fine, or a folder that already has them)
         #[arg(long)]
         models_dir: Option<PathBuf>,
@@ -92,6 +95,8 @@ enum Cmd {
         #[arg(long)]
         dit: Option<String>,
         #[arg(long)]
+        speed: Option<String>,
+        #[arg(long)]
         models_dir: Option<PathBuf>,
         #[arg(long)]
         output_dir: Option<PathBuf>,
@@ -133,7 +138,7 @@ async fn run(cli: Cli) -> Result<(), String> {
     let mut cfg = Config::load();
     match cli.cmd {
         Cmd::Doctor => doctor(&cfg),
-        Cmd::Setup { profile, dit, models_dir, runtime_dir } => {
+        Cmd::Setup { profile, dit, speed, models_dir, runtime_dir } => {
             if let Some(d) = runtime_dir {
                 cfg.runtime_dir = d;
                 cfg.models_dir = cfg.runtime_dir.join("models");
@@ -143,6 +148,9 @@ async fn run(cli: Cli) -> Result<(), String> {
             }
             if let Some(d) = dit {
                 cfg.dit = Dit::parse(&d).ok_or("dit must be official or uncensored")?;
+            }
+            if let Some(s) = speed {
+                cfg.speed = Speed::parse(&s).ok_or("speed must be base or turbo")?;
             }
             cfg.profile = match profile {
                 Some(p) => Profile::parse(&p).ok_or("profile must be balanced or compact")?,
@@ -176,7 +184,7 @@ async fn run(cli: Cli) -> Result<(), String> {
             let inputs = inputs.unwrap_or_else(|| suite.parent().unwrap_or(Path::new(".")).join("inputs"));
             bench(&cfg, &suite, &out, &inputs, &only, &preset, seed, force, keep_engine).await
         }
-        Cmd::Config { profile, dit, models_dir, output_dir } => {
+        Cmd::Config { profile, dit, speed, models_dir, output_dir } => {
             let mut changed = false;
             if let Some(p) = profile {
                 cfg.profile = Profile::parse(&p).ok_or("profile must be balanced or compact")?;
@@ -184,6 +192,10 @@ async fn run(cli: Cli) -> Result<(), String> {
             }
             if let Some(d) = dit {
                 cfg.dit = Dit::parse(&d).ok_or("dit must be official or uncensored")?;
+                changed = true;
+            }
+            if let Some(s) = speed {
+                cfg.speed = Speed::parse(&s).ok_or("speed must be base or turbo")?;
                 changed = true;
             }
             if let Some(d) = models_dir {
@@ -230,6 +242,7 @@ fn doctor(cfg: &Config) -> Result<(), String> {
     }
     println!("profile    {} ({})", serde_json::to_value(cfg.profile).unwrap().as_str().unwrap(), cfg.profile.label());
     println!("dit        {} ({})", serde_json::to_value(cfg.dit).unwrap().as_str().unwrap(), cfg.dit.label());
+    println!("speed      {} ({})", serde_json::to_value(cfg.speed).unwrap().as_str().unwrap(), cfg.speed.label());
     if let Some(g) = &st.gpu {
         let rec = Profile::for_vram(g.total_mb);
         if rec != cfg.profile {

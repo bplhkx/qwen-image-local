@@ -198,8 +198,10 @@ pub async fn run(
     let prompt = if req.transparent && refs.is_empty() { wrap_transparent(&req.prompt) } else { req.prompt.clone() };
     let (w, h) = dims(&req.aspect, p.megapixels);
     let seed = req.seed.unwrap_or_else(|| rand::thread_rng().gen_range(0..(1u64 << 48)));
-    let dit_name = cfg.dit.model().name;
-    let graph = build_graph(&prompt, &refs, w, h, p.steps, seed, p.edit_res, cfg.profile.encoder().name, dit_name);
+    let dit_name = cfg.models()[0].name;
+    // Turbo runs its distilled 8-step schedule; base keeps the preset's step count.
+    let steps = cfg.speed.steps(p.steps);
+    let graph = build_graph(&prompt, &refs, w, h, steps, seed, p.edit_res, cfg.profile.encoder().name, dit_name);
 
     // Open the WebSocket before queueing so the first events are not lost.
     let client_id = format!("qil-{tag}");
@@ -329,7 +331,7 @@ pub async fn run(
         height,
         seconds: t0.elapsed().as_secs_f64(),
         sample_seconds: sample_secs,
-        steps: p.steps,
+        steps,
         prompt: req.prompt.clone(),
         mode: req.mode.clone(),
         preset: req.preset.clone(),
@@ -337,9 +339,9 @@ pub async fn run(
     let round1 = |x: f64| (x * 10.0).round() / 10.0;
     let meta = json!({
         "prompt": req.prompt, "mode": req.mode, "preset": req.preset, "aspect": req.aspect,
-        "seed": seed, "steps": p.steps, "width": width, "height": height, "transparent": req.transparent,
+        "seed": seed, "steps": steps, "width": width, "height": height, "transparent": req.transparent,
         "references": req.images, "seconds": round1(result.seconds), "sampleSeconds": round1(sample_secs),
-        "model": "Qwen-Image-2.1", "dit": cfg.dit.model().name, "encoder": cfg.profile.encoder().name,
+        "model": "Qwen-Image-2.1", "dit": dit_name, "speed": cfg.speed.id(), "encoder": cfg.profile.encoder().name,
         "app": concat!("qwen-image-local ", env!("CARGO_PKG_VERSION")),
         "created": chrono::Local::now().to_rfc3339(),
     });

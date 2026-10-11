@@ -62,6 +62,16 @@ pub const DIT_UC: ModelFile = ModelFile {
     base: Some(HF_BASE_UC),
     remote: Some("qwen-image-2.1-UC-int8_convrot.safetensors"),
 };
+/// Official Turbo DiT: distilled 8-step checkpoint, same int8 convrot format and size class
+/// as `DIT`, hosted in the same Comfy-Org repo (no base/remote override needed).
+pub const DIT_TURBO: ModelFile = ModelFile {
+    folder: "diffusion_models",
+    name: "qwen_image_2.1_turbo_int8_convrot.safetensors",
+    size: 7_256_787_829,
+    sha256: "8144a0182964aa8403ad6dbc011db837304167d235161b9aabaa8532e967314c",
+    base: None,
+    remote: None,
+};
 pub const TE_INT8: ModelFile = ModelFile {
     folder: "text_encoders",
     name: "qwen3vl_8b_int8_convrot.safetensors",
@@ -109,11 +119,19 @@ impl Dit {
     pub fn all() -> [Dit; 2] {
         [Dit::Official, Dit::Uncensored]
     }
-    pub fn model(self) -> ModelFile {
-        match self {
-            Dit::Official => DIT,
-            Dit::Uncensored => DIT_UC,
+    /// The DiT weights for a speed tier. `None` when the combination has no published
+    /// weights (uncensored + turbo is not offered yet).
+    pub fn model_for(self, speed: Speed) -> Option<ModelFile> {
+        match (self, speed) {
+            (Dit::Official, Speed::Base) => Some(DIT),
+            (Dit::Official, Speed::Turbo) => Some(DIT_TURBO),
+            (Dit::Uncensored, Speed::Base) => Some(DIT_UC),
+            (Dit::Uncensored, Speed::Turbo) => None,
         }
+    }
+    /// Base-tier weights, always available.
+    pub fn model(self) -> ModelFile {
+        self.model_for(Speed::Base).expect("the base tier always exists")
     }
     pub fn label(self) -> &'static str {
         match self {
@@ -125,6 +143,50 @@ impl Dit {
         match s.to_ascii_lowercase().as_str() {
             "official" | "default" | "qwen" => Some(Dit::Official),
             "uncensored" | "uc" => Some(Dit::Uncensored),
+            _ => None,
+        }
+    }
+}
+
+/// Sampling-speed tier, orthogonal to `Dit`: how many denoising steps the checkpoint needs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Speed {
+    /// Standard checkpoint: 20–40 steps depending on the quality preset.
+    #[default]
+    Base,
+    /// Official Turbo checkpoint: distilled for 8 steps at CFG 1, ~3-4x faster sampling.
+    Turbo,
+}
+
+impl Speed {
+    /// Stable id used in the UI and config JSON.
+    pub fn id(self) -> &'static str {
+        match self {
+            Speed::Base => "base",
+            Speed::Turbo => "turbo",
+        }
+    }
+    pub fn all() -> [Speed; 2] {
+        [Speed::Base, Speed::Turbo]
+    }
+    pub fn label(self) -> &'static str {
+        match self {
+            Speed::Base => "Standard (20–40 steps)",
+            Speed::Turbo => "Turbo (8 steps)",
+        }
+    }
+    /// Denoising steps this tier uses. Turbo always runs its distilled 8-step schedule.
+    pub fn steps(self, preset_steps: u32) -> u32 {
+        match self {
+            Speed::Base => preset_steps,
+            Speed::Turbo => 8,
+        }
+    }
+    pub fn parse(s: &str) -> Option<Speed> {
+        match s.to_ascii_lowercase().as_str() {
+            "base" | "standard" | "normal" => Some(Speed::Base),
+            "turbo" | "fast" => Some(Speed::Turbo),
             _ => None,
         }
     }
@@ -152,9 +214,10 @@ impl Profile {
     pub fn models(self) -> [ModelFile; 3] {
         [DIT, self.encoder(), VAE]
     }
-    /// Models for this profile with a specific DiT (the encoder and VAE stay the same).
-    pub fn models_with(self, dit: Dit) -> [ModelFile; 3] {
-        [dit.model(), self.encoder(), VAE]
+    /// Models for this profile with a specific DiT + speed tier (the encoder and VAE stay the same).
+    /// Falls back to the official DiT when the combination has no weights (uncensored + turbo).
+    pub fn models_with(self, dit: Dit, speed: Speed) -> [ModelFile; 3] {
+        [dit.model_for(speed).unwrap_or(DIT), self.encoder(), VAE]
     }
     pub fn label(self) -> &'static str {
         match self {
@@ -185,6 +248,9 @@ pub struct Config {
     /// Which DiT (image model) to load.
     #[serde(default)]
     pub dit: Dit,
+    /// Sampling-speed tier: standard checkpoint or the distilled 8-step Turbo.
+    #[serde(default)]
+    pub speed: Speed,
     /// Where generated images go.
     pub output_dir: PathBuf,
     #[serde(default = "default_port")]
@@ -211,6 +277,7 @@ impl Default for Config {
             runtime_dir,
             profile: Profile::default(),
             dit: Dit::default(),
+            speed: Speed::default(),
             output_dir: dirs::picture_dir()
                 .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("Pictures"))
                 .join("Qwen Image Local"),
@@ -249,7 +316,7 @@ impl Config {
 
     /// The three weights this config needs: selected DiT + profile encoder + VAE.
     pub fn models(&self) -> [ModelFile; 3] {
-        self.profile.models_with(self.dit)
+        self.profile.models_with(self.dit, self.speed)
     }
     pub fn comfy_dir(&self) -> PathBuf {
         self.runtime_dir.join("ComfyUI")
@@ -317,5 +384,35 @@ mod tests {
         // encoder + vae unchanged
         assert_eq!(c.models()[1].name, TE_INT8.name);
         assert_eq!(c.models()[2].name, VAE.name);
+    }
+
+    #[test]
+    fn turbo_dit_url_and_combination() {
+        assert_eq!(
+            DIT_TURBO.url(),
+            "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/diffusion_models/qwen_image_2.1_turbo_int8_convrot.safetensors"
+        );
+        // Official + Turbo picks the turbo weights; encoder and VAE stay shared.
+        let m = Profile::Compact.models_with(Dit::Official, Speed::Turbo);
+        assert_eq!(m[0].name, DIT_TURBO.name);
+        assert_eq!(m[1].name, TE_W4A8.name);
+        assert_eq!(m[2].name, VAE.name);
+        // Uncensored + Turbo has no weights yet and falls back to the official DiT.
+        assert!(Dit::Uncensored.model_for(Speed::Turbo).is_none());
+        let fb = Profile::Balanced.models_with(Dit::Uncensored, Speed::Turbo);
+        assert_eq!(fb[0].name, DIT.name);
+        // Turbo runs its distilled 8-step schedule regardless of preset.
+        assert_eq!(Speed::Turbo.steps(40), 8);
+        assert_eq!(Speed::Base.steps(40), 40);
+        assert_eq!(Speed::parse("turbo"), Some(Speed::Turbo));
+    }
+
+    #[test]
+    fn speed_is_backward_compatible_in_json() {
+        // An old config.json without the "speed" key must still deserialize.
+        let old = r#"{"runtimeDir":"r","modelsDir":"m","profile":"compact","dit":"uncensored","outputDir":"o","port":8188}"#;
+        let c: Config = serde_json::from_str(old).unwrap();
+        assert_eq!(c.speed, Speed::Base);
+        assert_eq!(c.models()[0].name, DIT_UC.name);
     }
 }
