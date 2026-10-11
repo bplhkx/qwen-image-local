@@ -207,6 +207,13 @@ async fn thumbnail(path: String, size: Option<u32>) -> Result<String, String> {
     .map_err(|e| e.to_string())?
 }
 
+/// Let the UI show a user-picked reference file through asset:// by allowing that
+/// exact path — one file at a time, never a whole directory.
+#[tauri::command]
+fn allow_asset(app: AppHandle, path: String) -> Result<(), String> {
+    app.asset_protocol_scope().allow_file(&path).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 async fn pick_images(app: AppHandle) -> Vec<String> {
     app.dialog()
@@ -301,6 +308,7 @@ pub fn run() {
             thumbnail,
             rotate_image,
             pick_images,
+            allow_asset,
             list_outputs,
             output_dir,
             reveal,

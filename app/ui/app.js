@@ -295,6 +295,7 @@
       const ref = { path, thumb: "" };
       state.refs.push(ref);
       renderRefs();
+      invoke("allow_asset", { path }).catch(() => {});
       try { ref.thumb = await invoke("thumbnail", { path, size: 240 }); } catch (e) { notify(String(e)); }
       renderRefs();
     }
@@ -309,6 +310,7 @@
       ref.orig ??= ref.path;
       ref.path = path;
       ref.thumb = thumb;
+      invoke("allow_asset", { path }).catch(() => {});
     } catch (e) { notify(String(e)); }
     renderRefs();
   }
@@ -322,7 +324,8 @@
       el.title = (i === 0 ? t("canvas") + " · " : "") + r.path;
       el.innerHTML = `${r.thumb ? `<img src="${r.thumb}" alt="">` : ""}<span class="n">${i + 1}</span><button type="button" class="rot" aria-label="${t("rotate")}" title="${t("rotate")}">↻</button><button type="button" class="x" aria-label="${t("remove")}">×</button>`;
       el.querySelector(".x").addEventListener("click", () => { state.refs.splice(i, 1); renderRefs(); updateGenButton(); });
-      el.querySelector(".rot").addEventListener("click", (e) => rotateRef(r, e.currentTarget));
+      el.querySelector(".rot").addEventListener("click", (e) => { e.stopPropagation(); rotateRef(r, e.currentTarget); });
+      el.addEventListener("click", (e) => { if (!e.target.closest("button")) openZoom(fileSrc(r.path)); });
       box.appendChild(el);
     });
     if (state.refs.length < MAX_REFS) {
@@ -566,15 +569,17 @@
     setMode("text");
   });
 
-  // Zoom
-  $("shot").addEventListener("click", () => {
-    if (!state.current || state.busy) return;
+  // Zoom — one fullscreen overlay for the result and the reference photos alike.
+  function openZoom(src) {
+    if (state.busy) return;
+    if (document.querySelector(".zoom")) return;
     const z = document.createElement("div");
     z.className = "zoom";
-    z.innerHTML = `<img src="${fileSrc(state.current.path)}" alt="">`;
+    z.innerHTML = `<img src="${src}" alt="">`;
     z.addEventListener("click", () => z.remove());
     document.body.appendChild(z);
-  });
+  }
+  $("shot").addEventListener("click", () => state.current && openZoom(fileSrc(state.current.path)));
 
   // Notices
   function notify(msg, ok = false) {
