@@ -164,35 +164,6 @@ fn open_upright(path: &str) -> Result<image::DynamicImage, String> {
     Ok(img)
 }
 
-/// Writes a copy of a reference turned 90° clockwise and returns its path. The user's file is
-/// never touched; the copy is what gets uploaded to the engine.
-#[tauri::command]
-async fn rotate_image(settings: State<'_, Settings>, path: String) -> Result<String, String> {
-    let dir = cfg(&settings).runtime_dir.join("rotated");
-    tauri::async_runtime::spawn_blocking(move || {
-        let img = open_upright(&path)?.rotate90();
-        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-        let stem = std::path::Path::new(&path).file_stem().and_then(|s| s.to_str()).unwrap_or("image");
-        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
-        // Keep transparency when there is any; photos go back to JPEG so uploads stay small.
-        let out = if img.color().has_alpha() {
-            let out = dir.join(format!("{stem}_{stamp}.png"));
-            img.save(&out).map_err(|e| e.to_string())?;
-            out
-        } else {
-            let out = dir.join(format!("{stem}_{stamp}.jpg"));
-            let file = std::io::BufWriter::new(std::fs::File::create(&out).map_err(|e| e.to_string())?);
-            image::codecs::jpeg::JpegEncoder::new_with_quality(file, 95)
-                .encode_image(&img.to_rgb8())
-                .map_err(|e| e.to_string())?;
-            out
-        };
-        Ok(out.to_string_lossy().into_owned())
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
 /// JPEG thumbnail as a data URL, so the UI can show references without file-system access.
 #[tauri::command]
 async fn thumbnail(path: String, size: Option<u32>) -> Result<String, String> {
@@ -212,6 +183,42 @@ async fn thumbnail(path: String, size: Option<u32>) -> Result<String, String> {
 #[tauri::command]
 fn allow_asset(app: AppHandle, path: String) -> Result<(), String> {
     app.asset_protocol_scope().allow_file(&path).map_err(|e| e.to_string())
+}
+
+/// Raw file bytes as a data URL for the image editor. Loading through asset:// would taint
+/// the canvas and break toDataURL; a data URL keeps the export working.
+#[tauri::command]
+async fn read_image(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes = std::fs::read(&path).map_err(|e| format!("Cannot read {path}: {e}"))?;
+        let mime = match std::path::Path::new(&path).extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase().as_str() {
+            "png" => "image/png",
+            "jpg" | "jpeg" => "image/jpeg",
+            "webp" => "image/webp",
+            "bmp" => "image/bmp",
+            _ => "application/octet-stream",
+        };
+        Ok(format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Saves the editor's PNG export (data URL) into runtime/edited/ and returns the new path.
+#[tauri::command]
+async fn save_edited(settings: State<'_, Settings>, data_url: String) -> Result<String, String> {
+    let dir = cfg(&settings).runtime_dir.join("edited");
+    tauri::async_runtime::spawn_blocking(move || {
+        let b64 = data_url.split_once(',').ok_or("bad data URL")?.1;
+        let bytes = base64::engine::general_purpose::STANDARD.decode(b64).map_err(|e| e.to_string())?;
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
+        let out = dir.join(format!("edit_{stamp}.png"));
+        std::fs::write(&out, bytes).map_err(|e| e.to_string())?;
+        Ok(out.to_string_lossy().into_owned())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -306,9 +313,10 @@ pub fn run() {
             surprise_idea,
             gpu_stats,
             thumbnail,
-            rotate_image,
             pick_images,
             allow_asset,
+            read_image,
+            save_edited,
             list_outputs,
             output_dir,
             reveal,

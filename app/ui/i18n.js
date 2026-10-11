@@ -57,6 +57,10 @@
       cancelled: "Generation cancelled.", copied: "Prompt copied.", copyFail: "Could not copy.",
       limitRefs: (a, b, m) => `Added ${a} of ${b}: the limit is ${m} references.`,
       canvas: "Canvas", remove: "Remove", rotate: "Rotate 90°", refs: "refs",
+      edit: "Edit", edTitle: "Annotate", edBrush: "Brush", edCircle: "Circle", edRect: "Box", edArrow: "Arrow",
+      edSelect: "Select", edEraser: "Eraser", edCrop: "Crop", edUndo: "Undo", edRedo: "Redo", edCropClear: "Clear crop",
+      edApply: "Apply", edLoadFail: "Could not open this image.",
+      edHint: "Mark the area to change: circles, boxes, arrows or free strokes. Colors tell the model which region is which — describe each mark in the instruction.",
       eventsFail: "Could not register events (check capabilities/default.json): ",
     },
     es: {
@@ -115,6 +119,10 @@
       cancelled: "Generación cancelada.", copied: "Prompt copiado.", copyFail: "No se pudo copiar.",
       limitRefs: (a, b, m) => `Se agregaron ${a} de ${b}: el límite es ${m} referencias.`,
       canvas: "Lienzo", remove: "Quitar", rotate: "Girar 90°", refs: "ref.",
+      edit: "Editar", edTitle: "Anotar", edBrush: "Pincel", edCircle: "Círculo", edRect: "Caja", edArrow: "Flecha",
+      edSelect: "Seleccionar", edEraser: "Borrar", edCrop: "Recortar", edUndo: "Deshacer", edRedo: "Rehacer", edCropClear: "Quitar recorte",
+      edApply: "Aplicar", edLoadFail: "No se pudo abrir esta imagen.",
+      edHint: "Marcá la zona a cambiar: círculos, cajas, flechas o trazos libres. Los colores le dicen al modelo qué región es cuál — describí cada marca en la instrucción.",
       eventsFail: "No se pudieron registrar los eventos (revisá capabilities/default.json): ",
     },
     zh: {
@@ -173,6 +181,10 @@
       cancelled: "已取消生成", copied: "提示词已复制", copyFail: "复制失败",
       limitRefs: (a, b, m) => `已添加 ${a} / ${b} 张：最多只能放 ${m} 张参考图`,
       canvas: "画布", remove: "移除", rotate: "旋转 90°", refs: "参考",
+      edit: "编辑", edTitle: "标注", edBrush: "画笔", edCircle: "圈选", edRect: "框选", edArrow: "箭头",
+      edSelect: "选择", edEraser: "擦除", edCrop: "裁剪", edUndo: "撤销", edRedo: "重做", edCropClear: "取消裁剪",
+      edApply: "应用", edLoadFail: "无法打开这张图片",
+      edHint: "圈出要修改的位置：圆圈、方框、箭头或随手涂抹。不同颜色代表不同区域，记得在指令里说清楚每一处要改成什么。",
       eventsFail: "无法注册事件（请检查 capabilities/default.json）：",
     },
   };

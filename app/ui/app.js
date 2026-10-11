@@ -301,18 +301,20 @@
     }
     updateGenButton();
   }
-  // Turns a copy of the photo, never the user's file; the copy is what the engine gets.
-  async function rotateRef(ref, btn) {
-    btn.disabled = true;
-    try {
-      const path = await invoke("rotate_image", { path: ref.path });
-      const thumb = await invoke("thumbnail", { path, size: 240 });
-      ref.orig ??= ref.path;
-      ref.path = path;
-      ref.thumb = thumb;
-      invoke("allow_asset", { path }).catch(() => {});
-    } catch (e) { notify(String(e)); }
-    renderRefs();
+  // Opens the annotation editor; saving swaps the reference to the edited copy.
+  function editRef(ref) {
+    window.qilEditor.open({
+      path: ref.path,
+      notify,
+      onSave: async (path) => {
+        ref.orig ??= ref.path;
+        ref.path = path;
+        invoke("allow_asset", { path }).catch(() => {});
+        ref.thumb = await invoke("thumbnail", { path, size: 240 }).catch(() => "");
+        renderRefs();
+        updateGenButton();
+      },
+    });
   }
   function renderRefs() {
     const box = $("refs");
@@ -322,9 +324,9 @@
       const el = document.createElement("div");
       el.className = "ref" + (i === 0 ? " canvas" : "");
       el.title = (i === 0 ? t("canvas") + " · " : "") + r.path;
-      el.innerHTML = `${r.thumb ? `<img src="${r.thumb}" alt="">` : ""}<span class="n">${i + 1}</span><button type="button" class="rot" aria-label="${t("rotate")}" title="${t("rotate")}">↻</button><button type="button" class="x" aria-label="${t("remove")}">×</button>`;
+      el.innerHTML = `${r.thumb ? `<img src="${r.thumb}" alt="">` : ""}<span class="n">${i + 1}</span><button type="button" class="rot" aria-label="${t("edit")}" title="${t("edit")}">✎</button><button type="button" class="x" aria-label="${t("remove")}">×</button>`;
       el.querySelector(".x").addEventListener("click", () => { state.refs.splice(i, 1); renderRefs(); updateGenButton(); });
-      el.querySelector(".rot").addEventListener("click", (e) => { e.stopPropagation(); rotateRef(r, e.currentTarget); });
+      el.querySelector(".rot").addEventListener("click", (e) => { e.stopPropagation(); editRef(r); });
       el.addEventListener("click", (e) => { if (!e.target.closest("button")) openZoom(fileSrc(r.path)); });
       box.appendChild(el);
     });

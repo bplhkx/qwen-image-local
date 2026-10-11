@@ -244,7 +244,41 @@
 
   <div class="dropveil" id="dropveil" hidden><p data-i18n="dropHere"></p></div>
 
+  <!-- ── Image editor ── -->
+  <div class="editor" id="editor" hidden>
+    <div class="ed-bar">
+      <span class="ed-title" data-i18n="edTitle"></span>
+      <div class="ed-tools" role="group" aria-label="Tools">
+        <button type="button" class="ed-tool" data-tool="brush" data-i18n="edBrush"></button>
+        <button type="button" class="ed-tool" data-tool="circle" data-i18n="edCircle"></button>
+        <button type="button" class="ed-tool" data-tool="rect" data-i18n="edRect"></button>
+        <button type="button" class="ed-tool" data-tool="arrow" data-i18n="edArrow"></button>
+        <button type="button" class="ed-tool" data-tool="select" data-i18n="edSelect"></button>
+        <button type="button" class="ed-tool" data-tool="eraser" data-i18n="edEraser"></button>
+        <button type="button" class="ed-tool" data-tool="crop" data-i18n="edCrop"></button>
+      </div>
+      <div class="ed-palette" id="edPalette"></div>
+      <input type="color" id="edColor" value="#ff3b30" aria-label="Custom color">
+      <div class="ed-widths" id="edWidths"></div>
+      <div class="ed-actions">
+        <button type="button" class="btn btn-sm" id="edRotate" data-i18n="rotate"></button>
+        <button type="button" class="btn btn-sm" id="edUndo" data-i18n="edUndo"></button>
+        <button type="button" class="btn btn-sm" id="edRedo" data-i18n="edRedo"></button>
+        <button type="button" class="btn btn-sm" id="edCropClear" data-i18n="edCropClear" hidden></button>
+      </div>
+      <div class="ed-foot">
+        <button type="button" class="btn btn-sm" id="edCancel" data-i18n="cancel"></button>
+        <button type="button" class="btn btn-sm btn-primary" id="edSave" data-i18n="edApply"></button>
+        <button type="button" class="btn btn-sm" id="edClose" data-i18n="close"></button>
+      </div>
+    </div>
+    <div class="ed-wrap" id="edWrap"><canvas id="edCanvas"></canvas></div>
+    <p class="ed-hint" data-i18n="edHint"></p>
+  </div>
+
+  <script src="vendor/fabric.min.js"></script>
   <script src="i18n.js"></script>
+  <script src="editor.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
