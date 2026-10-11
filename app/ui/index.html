@@ -76,6 +76,21 @@
           </div>
 
           <div class="group">
+            <span class="label" data-i18n="speedLabel"></span>
+            <div class="presets" id="speeds" role="radiogroup">
+              <button type="button" role="radio" data-speed="base" aria-checked="true">
+                <span class="p-name" data-i18n="speedBase"></span>
+                <span class="p-meta mono" data-i18n="speedBaseMeta"></span>
+              </button>
+              <button type="button" role="radio" data-speed="turbo" aria-checked="false">
+                <span class="p-name" data-i18n="speedTurbo"></span>
+                <span class="p-meta mono" data-i18n="speedTurboMeta"></span>
+              </button>
+            </div>
+            <p class="hint" data-i18n="speedHint"></p>
+          </div>
+
+          <div class="group">
             <span class="label" data-i18n="modelsFolder"></span>
             <div class="pathrow">
               <span class="mono path" id="modelsDir"></span>
@@ -160,19 +175,31 @@
             </button>
           </div>
           <p class="hint" id="ditMainHint" data-i18n="ditMainHint"></p>
+          <div class="label-row" style="margin-top:8px"><span class="label" data-i18n="speedLabel"></span></div>
+          <div class="presets" id="speedsMain" role="radiogroup">
+            <button type="button" role="radio" data-speed="base" aria-checked="true">
+              <span class="p-name" data-i18n="speedBase"></span>
+              <span class="p-meta mono" data-i18n="speedBaseMeta"></span>
+            </button>
+            <button type="button" role="radio" data-speed="turbo" aria-checked="false">
+              <span class="p-name" data-i18n="speedTurbo"></span>
+              <span class="p-meta mono" data-i18n="speedTurboMeta"></span>
+            </button>
+          </div>
+          <p class="hint" id="speedMainHint" data-i18n="speedMainHint"></p>
         </section>
 
         <section class="group">
           <span class="label" data-i18n="quality"></span>
           <div class="presets" id="presets" role="radiogroup">
             <button type="button" role="radio" data-preset="draft" aria-checked="false">
-              <span class="p-name" data-i18n="pDraft"></span><span class="p-meta mono" data-t="1024² · 20 · ~35 s" data-e="1024 px · 20 · ~50 s"></span>
+              <span class="p-name" data-i18n="pDraft"></span><span class="p-meta mono" data-t="1024² · 20 · ~35 s" data-e="1024 px · 20 · ~50 s" data-tt="1024² · 8 · ~30 s"></span>
             </button>
             <button type="button" role="radio" data-preset="standard" aria-checked="true">
-              <span class="p-name" data-i18n="pStandard"></span><span class="p-meta mono" data-t="1.6 MP · 30 · ~1.5 min" data-e="1280 px · 30 · ~2.5 min"></span>
+              <span class="p-name" data-i18n="pStandard"></span><span class="p-meta mono" data-t="1.6 MP · 30 · ~1.5 min" data-e="1280 px · 30 · ~2.5 min" data-tt="1.6 MP · 8 · ~45 s"></span>
             </button>
             <button type="button" role="radio" data-preset="max" aria-checked="false">
-              <span class="p-name" data-i18n="pMax"></span><span class="p-meta mono" data-t="2K · 40 · ~7 min" data-e="1536 px · 40 · ~5 min"></span>
+              <span class="p-name" data-i18n="pMax"></span><span class="p-meta mono" data-t="2K · 40 · ~7 min" data-e="1536 px · 40 · ~5 min" data-tt="2K · 8 · ~1.5 min"></span>
             </button>
           </div>
           <p class="hint mono" data-i18n="presetLegend"></p>

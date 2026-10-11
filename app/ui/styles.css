@@ -184,6 +184,8 @@ input.mono { font-family: var(--font-mono); font-size: 12px; }
 }
 .presets button:last-child { border-bottom: 0; }
 .presets button:hover { background: var(--hover); }
+.presets button:disabled { opacity: 0.45; cursor: not-allowed; }
+.presets button:disabled:hover { background: var(--panel); }
 .presets button[aria-checked="true"] { background: var(--sunken); }
 .presets button[aria-checked="true"]::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--text); }
 .p-name { font-weight: 500; }
