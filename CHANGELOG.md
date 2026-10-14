@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0 — 2026-10-14
+
+- **Remote access.** The app now opens a LAN HTTP API on its own port (8199) as soon as it starts, so a phone or another PC can drive it: check the engine, start and stop it, read the history, fetch full images and thumbnails, upload reference photos, delete an output, change the model and speed, and run generations while polling for progress. A bearer token is generated on first launch and shown, with the addresses to type, in a new "Remote access" section of the panel. Everything is limited to the output folder — path checks resolve symlinks and `..` before comparing — and uploaded references have to decode as real images before the generator will accept them. See `GET /api/ping` for the endpoint list.
+- **History right-click menu.** Right-click any thumbnail to open it, reveal it in Explorer, copy its prompt or delete it; deleting takes the `.json` sidecar with it and asks first.
+- **Close confirmation.** The window's X button now asks before quitting, and says what is at stake — an unfinished generation, or the engine that stops with the app.
+- **Prompt presets.** Save the description or instruction you just wrote under a name; presets are kept per mode, load with one click, and can be removed from the chip or its right-click menu.
+- **Dev path overrides no longer reach the disk.** Running under `QIL_RUNTIME` / `QIL_MODELS` and then saving a setting used to write those throwaway paths into the real `config.json`, pointing the install at an empty folder. Only the paths you chose in the app are persisted now.
+
+
 ## 0.3.0 — 2026-10-11
 
 - **Turbo speed tier.** Pick the distilled 8-step checkpoint instead of the 20–40-step standard one: about 3–4× faster sampling. It is orthogonal to the VRAM profile and the DiT choice, so you can run Turbo on Balanced or Compact; the Uncensored model doesn't have Turbo weights yet and falls back to the standard checkpoint. Selectable in the app (setup screen and main UI) and in the CLI (`qil setup --speed turbo`, `qil config --speed turbo`).
