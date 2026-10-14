@@ -135,8 +135,14 @@
         </section>
 
         <section class="group" data-show="text">
-          <label class="label" for="promptText" data-i18n="description"></label>
+          <div class="label-row">
+            <label class="label" for="promptText" data-i18n="description"></label>
+            <div class="mini-actions">
+              <button type="button" class="btn btn-xs" id="saveText" data-i18n="savePreset"></button>
+            </div>
+          </div>
           <textarea id="promptText" rows="7" spellcheck="false" data-i18n-ph="descPh"></textarea>
+          <div class="quick" id="userText" hidden></div>
           <label class="check"><input type="checkbox" id="transparent"> <span data-i18n="transparent"></span> <span class="mono muted">PNG + alpha</span></label>
         </section>
 
@@ -147,8 +153,14 @@
           </div>
           <div class="refs" id="refs"></div>
           <p class="hint" data-i18n-html="refsHint"></p>
-          <label class="label" for="promptPhotos" data-i18n="instruction"></label>
+          <div class="label-row">
+            <label class="label" for="promptPhotos" data-i18n="instruction"></label>
+            <div class="mini-actions">
+              <button type="button" class="btn btn-xs" id="savePhotos" data-i18n="savePreset"></button>
+            </div>
+          </div>
           <textarea id="promptPhotos" rows="5" spellcheck="false" data-i18n-ph="instrPh"></textarea>
+          <div class="quick" id="userPhotos" hidden></div>
           <div class="quick" id="quick"></div>
         </section>
 
@@ -226,6 +238,24 @@
           </div>
           <input id="seed" type="text" inputmode="numeric" class="mono" data-i18n-ph="seedPh" disabled>
         </section>
+
+        <section class="group">
+          <div class="label-row">
+            <span class="label" data-i18n="remoteTitle"></span>
+            <label class="check check-sm"><input type="checkbox" id="remoteOn"> <span data-i18n="remoteEnable"></span></label>
+          </div>
+          <p class="hint" data-i18n="remoteHint"></p>
+          <div class="pathrow">
+            <span class="mono path" id="remoteUrl" title=""></span>
+            <button type="button" class="btn btn-xs" id="remoteCopyUrl" data-i18n="copy"></button>
+          </div>
+          <div class="pathrow">
+            <span class="mono path" id="remoteToken"></span>
+            <button type="button" class="btn btn-xs" id="remoteCopyToken" data-i18n="copy"></button>
+            <button type="button" class="btn btn-xs" id="remoteNew" data-i18n="remoteNew"></button>
+          </div>
+          <p class="hint" id="remoteNote" hidden></p>
+        </section>
       </div>
 
       <div class="panel-foot">
@@ -270,6 +300,18 @@
   </div>
 
   <div class="dropveil" id="dropveil" hidden><p data-i18n="dropHere"></p></div>
+
+  <!-- ── Confirm dialog: quit, delete an image, name a preset ── -->
+  <div class="modal" id="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <p class="modal-title" id="modalTitle"></p>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-actions" id="modalActions"></div>
+    </div>
+  </div>
+
+  <!-- Right-click menu for the history strip and saved presets -->
+  <div class="ctxmenu" id="ctxmenu" hidden role="menu"></div>
 
   <!-- ── Image editor ── -->
   <div class="editor" id="editor" hidden>

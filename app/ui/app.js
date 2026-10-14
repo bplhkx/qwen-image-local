@@ -35,6 +35,7 @@
     setup: null, // SetupInfo from Rust
     installing: false,
     stepState: {}, // id -> {state, detail, done, total, bps}
+    remote: null, // {enabled, port, token, urls[]} from Rust
   };
 
   function localGet(k, d) { try { return localStorage.getItem("qil." + k) ?? d; } catch { return d; } }
@@ -261,6 +262,8 @@
     renderDitMain();
     renderSpeedGroup("speedsMain");
     renderPresets();
+    renderUserPresets();
+    loadRemote();
     invoke("output_dir").then((d) => { $("outDirTxt").textContent = d; }).catch(() => {});
     loadHistory();
     startEngine();
@@ -599,6 +602,11 @@
       b.setAttribute("aria-current", String(state.current?.path === item.path));
       b.innerHTML = `<img loading="lazy" decoding="async" src="${fileSrc(item.path)}" alt="">`;
       b.addEventListener("click", () => showImage(item));
+      b.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        showImage(item);
+        historyMenu(e, item);
+      });
       strip.appendChild(b);
     });
     $("histCount").textContent = String(state.history.length);
@@ -611,11 +619,7 @@
     } catch (e) { notify(String(e)); }
   }
 
-  $("aCopy").addEventListener("click", async () => {
-    const p = state.current?.meta?.prompt;
-    if (!p) return;
-    try { await navigator.clipboard.writeText(p); notify(t("copied"), true); } catch { notify(t("copyFail")); }
-  });
+  $("aCopy").addEventListener("click", () => copyText(state.current?.meta?.prompt));
   $("aSeed").addEventListener("click", () => {
     const s = state.current?.meta?.seed;
     if (s == null) return;
@@ -644,6 +648,283 @@
     setMode("text");
   });
 
+  // ═════════ Overlays: one modal, one right-click menu ═════════
+
+  const baseName = (p) => String(p).split(/[\\/]/).pop();
+  // Commands that only report failures; nothing to do with the value they return.
+  const fire = (p) => Promise.resolve(p).catch((e) => notify(String(e)));
+  async function copyText(text) {
+    if (!text) return;
+    try { await navigator.clipboard.writeText(text); notify(t("copied"), true); } catch { notify(t("copyFail")); }
+  }
+
+  let modalCancel = null;
+  function openModal({ title, body, actions }) {
+    $("modalTitle").textContent = title || "";
+    const box = $("modalBody");
+    box.innerHTML = "";
+    if (body instanceof Node) box.appendChild(body);
+    else if (body) {
+      const p = document.createElement("p");
+      p.className = "modal-text";
+      p.textContent = body;
+      box.appendChild(p);
+    }
+    const bar = $("modalActions");
+    bar.innerHTML = "";
+    modalCancel = null;
+    for (const a of actions) {
+      if (a.cancel) modalCancel = a.run || null;
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "btn btn-sm" + (a.primary ? " btn-primary" : "");
+      b.textContent = a.label;
+      b.addEventListener("click", () => { if (a.run && a.run() === false) return; closeModal(); });
+      bar.appendChild(b);
+    }
+    // Enter in a text field presses the primary button.
+    const input = box.querySelector("input");
+    if (input) input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); bar.querySelector(".btn-primary")?.click(); } });
+    $("modal").hidden = false;
+    (input || bar.querySelector(".btn:not(.btn-primary)") || bar.lastChild)?.focus();
+  }
+  function closeModal() { $("modal").hidden = true; modalCancel = null; }
+  function cancelModal() { const f = modalCancel; closeModal(); if (f) f(); }
+  $("modal").addEventListener("click", (e) => { if (e.target === $("modal")) cancelModal(); });
+
+  // The window's X button: Rust blocks the close and asks us here instead.
+  function askQuit(busy) {
+    const lines = [t("quitBody")];
+    if (busy) lines.push(t("quitBusy"));
+    else if (state.engine === "ready" || state.engine === "starting") lines.push(t("quitEngine"));
+    // One line per situation, so the warning never reads as a run-on sentence in CJK.
+    const body = document.createElement("div");
+    body.className = "modal-form";
+    for (const line of lines) {
+      const p = document.createElement("p");
+      p.className = "modal-text";
+      p.textContent = line;
+      body.appendChild(p);
+    }
+    openModal({
+      title: t("quitTitle"),
+      body,
+      actions: [
+        { label: t("stay"), cancel: true },
+        { label: t("quit"), primary: true, run: () => fire(invoke("app_exit")) },
+      ],
+    });
+  }
+
+  function showMenu(x, y, items) {
+    const m = $("ctxmenu");
+    m.innerHTML = "";
+    for (const it of items) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = it.label;
+      if (it.danger) b.className = "danger";
+      b.addEventListener("click", () => { hideMenu(); it.run(); });
+      m.appendChild(b);
+    }
+    m.hidden = false;
+    // The history strip sits against the bottom edge: keep the menu inside the window.
+    const r = m.getBoundingClientRect();
+    m.style.left = Math.max(6, Math.min(x, window.innerWidth - r.width - 6)) + "px";
+    m.style.top = Math.max(6, Math.min(y, window.innerHeight - r.height - 6)) + "px";
+  }
+  function hideMenu() { $("ctxmenu").hidden = true; }
+  document.addEventListener("click", hideMenu);
+  window.addEventListener("blur", hideMenu);
+  document.addEventListener("contextmenu", (e) => { if (!e.target.closest(".hist, .chip")) hideMenu(); });
+
+  // ── History: right-click for the actions the info bar has, plus delete ──
+  function historyMenu(e, item) {
+    const path = item.path;
+    showMenu(e.clientX, e.clientY, [
+      { label: t("menuView"), run: () => openZoom(fileSrc(path)) },
+      { label: t("open"), run: () => fire(invoke("open_path", { path })) },
+      { label: t("showInFolder"), run: () => fire(invoke("reveal", { path })) },
+      { label: t("copyPrompt"), run: () => copyText(item.meta?.prompt) },
+      { label: t("menuDelete"), danger: true, run: () => confirmDelete(item) },
+    ]);
+  }
+  function confirmDelete(item) {
+    const name = baseName(item.path);
+    openModal({
+      title: t("deleteTitle"),
+      body: t("deleteBody", name),
+      actions: [
+        { label: t("cancel"), cancel: true },
+        {
+          label: t("menuDelete"),
+          primary: true,
+          run: () => {
+            invoke("delete_output", { path: item.path })
+              .then(() => { dropFromHistory(item); notify(t("deleted", name)); })
+              .catch((e) => { notify(String(e)); loadHistory(); });
+          },
+        },
+      ],
+    });
+  }
+  function dropFromHistory(item) {
+    const i = state.history.indexOf(item);
+    if (i >= 0) state.history.splice(i, 1);
+    if (state.current?.path === item.path) {
+      state.current = null;
+      const next = state.history[0];
+      if (next) { renderHistory(); showImage(next); return; }
+      $("shot").hidden = true;
+      $("info").hidden = true;
+      if (!state.busy) $("empty").hidden = false;
+    }
+    renderHistory();
+  }
+
+  // ═════════ Remote access ═════════
+
+  async function loadRemote() {
+    try {
+      state.remote = await invoke("remote_info");
+      renderRemote();
+    } catch (e) {
+      remoteNote(String(e));
+    }
+  }
+  function remoteNote(msg) {
+    $("remoteNote").hidden = false;
+    $("remoteNote").textContent = msg;
+  }
+  function renderRemote() {
+    const r = state.remote;
+    if (!r) return;
+    $("remoteOn").checked = !!r.enabled;
+    // Prefer the LAN address; 127.0.0.1 is only useful for testing on the PC itself.
+    const url = (r.urls || []).find((u) => !u.includes("127.0.0.1")) || (r.urls || [])[0] || "";
+    $("remoteUrl").textContent = url;
+    $("remoteUrl").title = url;
+    $("remoteToken").textContent = r.token || "—";
+    remoteNote(r.enabled ? t("remoteLive", r.port) : t("remoteOffNote"));
+  }
+  async function saveRemote(patch) {
+    try {
+      state.remote = await invoke("remote_configure", patch);
+      renderRemote();
+      notify(t("remoteSaved"), true);
+    } catch (e) {
+      remoteNote(String(e));
+    }
+  }
+  $("remoteOn").addEventListener("change", (e) => saveRemote({ enabled: e.target.checked }));
+  $("remoteCopyUrl").addEventListener("click", () => copyText($("remoteUrl").textContent));
+  $("remoteCopyToken").addEventListener("click", () => copyText($("remoteToken").textContent));
+  $("remoteNew").addEventListener("click", () => saveRemote({ regenerate: true }));
+
+  // ═════════ Prompt presets ═════════
+
+  const promptEl = (mode) => $(mode === "photos" ? "promptPhotos" : "promptText");
+  const presetBox = (mode) => $(mode === "photos" ? "userPhotos" : "userText");
+  function presetsOf(mode) {
+    try {
+      const v = JSON.parse(localGet("presets." + mode, "[]"));
+      return Array.isArray(v) ? v.filter((p) => p && p.name && p.prompt) : [];
+    } catch { return []; }
+  }
+  function setPresets(mode, list) { localSet("presets." + mode, JSON.stringify(list.slice(0, 40))); }
+  // The first idea in the prompt, short enough to read as a chip. CJK has no spaces,
+  // so cut by code point rather than by word.
+  const stripEdges = (s) => s.replace(/^["'“‘「《]+|["'”’」》,.;：。…\s]+$/g, "").trim();
+  function suggestName(prompt) {
+    const clean = prompt.replace(/\s+/g, " ").trim();
+    const chars = [...clean];
+    if (chars.length <= 18) return stripEdges(clean) || clean.slice(0, 18);
+    let head = chars.slice(0, 18).join("");
+    const sp = head.lastIndexOf(" ");
+    if (sp > 8) head = head.slice(0, sp); // break a Latin word instead of slicing through it
+    return stripEdges(head) + "…";
+  }
+  function renderUserPresets() {
+    for (const mode of ["text", "photos"]) {
+      const box = presetBox(mode);
+      const list = presetsOf(mode);
+      box.hidden = list.length === 0;
+      box.innerHTML = "";
+      for (const p of list) {
+        const chip = document.createElement("span");
+        chip.className = "chip";
+        const name = document.createElement("button");
+        name.type = "button";
+        name.className = "chip-name";
+        name.textContent = p.name;
+        name.title = p.prompt;
+        name.addEventListener("click", () => { promptEl(mode).value = p.prompt; updateGenButton(); promptEl(mode).focus(); });
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "chip-x";
+        del.textContent = "×";
+        del.title = t("presetDel");
+        del.setAttribute("aria-label", t("presetDel"));
+        del.addEventListener("click", () => removePreset(mode, p));
+        chip.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          showMenu(e.clientX, e.clientY, [
+            { label: t("presetUse"), run: () => { promptEl(mode).value = p.prompt; updateGenButton(); promptEl(mode).focus(); } },
+            { label: t("copyPrompt"), run: () => copyText(p.prompt) },
+            { label: t("presetDel"), danger: true, run: () => removePreset(mode, p) },
+          ]);
+        });
+        chip.append(name, del);
+        box.appendChild(chip);
+      }
+    }
+  }
+  function removePreset(mode, p) {
+    // presetsOf() re-parses on every call, so identity never matches — compare by value.
+    setPresets(mode, presetsOf(mode).filter((x) => !(x.name === p.name && x.prompt === p.prompt)));
+    renderUserPresets();
+  }
+  function savePresetFlow(mode) {
+    const prompt = promptEl(mode).value.trim();
+    if (!prompt) return notify(t("presetEmpty"));
+    const list = presetsOf(mode);
+    if (list.some((x) => x.prompt === prompt)) return notify(t("presetDup", list.find((x) => x.prompt === prompt).name));
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "modal-input";
+    input.placeholder = t("presetName");
+    input.value = suggestName(prompt);
+    const preview = document.createElement("p");
+    preview.className = "modal-text muted";
+    preview.textContent = prompt.length > 160 ? prompt.slice(0, 160) + "…" : prompt;
+    const body = document.createElement("div");
+    body.className = "modal-form";
+    body.append(input, preview);
+    openModal({
+      title: t("presetTitle"),
+      body,
+      actions: [
+        { label: t("cancel"), cancel: true },
+        {
+          label: t("presetOk"),
+          primary: true,
+          run: () => {
+            const name = input.value.trim();
+            if (!name) { notify(t("presetNeedName")); return false; }
+            if (list.some((x) => x.name === name)) { notify(t("presetExists", name)); return false; }
+            setPresets(mode, [{ name, prompt }, ...list]);
+            renderUserPresets();
+            notify(t("presetSaved", name), true);
+          },
+        },
+      ],
+    });
+    input.select();
+  }
+
+  $("saveText").addEventListener("click", () => savePresetFlow("text"));
+  $("savePhotos").addEventListener("click", () => savePresetFlow("photos"));
+
   // Zoom — one fullscreen overlay for the result and the reference photos alike.
   function openZoom(src) {
     if (state.busy) return;
@@ -670,6 +951,9 @@
   document.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !$("mainView").hidden) { e.preventDefault(); generate(); }
     if (e.key === "Escape") {
+      // Topmost overlay first: menu, then dialog, then zoom, then the generation.
+      if (!$("ctxmenu").hidden) { hideMenu(); return; }
+      if (!$("modal").hidden) { cancelModal(); return; }
       const z = document.querySelector(".zoom");
       if (z) z.remove();
       else if (state.busy) invoke("cancel");
@@ -685,6 +969,7 @@
     renderHistory();
     renderEngine();
     renderSetup();
+    renderUserPresets();
     renderDitTags();
     renderDitMain();
     renderSpeedGroup("speeds");
@@ -699,6 +984,7 @@
       await listen("gen-progress", (e) => { if (state.busy) showWorking(e.payload.stage, e.payload.value, e.payload.max); });
       await listen("setup", (e) => onSetupEvent(e.payload));
       await listen("setup-finished", (e) => onSetupFinished(e.payload));
+      await listen("close-requested", (e) => askQuit(!!e.payload?.busy));
       await listen("tauri://drag-enter", () => { if (!$("mainView").hidden) $("dropveil").hidden = false; });
       await listen("tauri://drag-leave", () => { $("dropveil").hidden = true; });
       await listen("tauri://drag-drop", (e) => {
@@ -718,6 +1004,7 @@
     window.i18n.apply();
     setMode("text");
     renderQuick();
+    renderUserPresets();
     renderRefs();
     await wireEvents();
     pollGpu();

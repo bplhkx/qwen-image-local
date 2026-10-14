@@ -8,9 +8,10 @@ pub mod download;
 pub mod engine;
 pub mod generate;
 pub mod gpu;
+pub mod remote;
 pub mod setup;
 pub mod surprise;
 
-pub use config::{Config, Dit, Profile, Speed};
+pub use config::{Config, Dit, Profile, Remote, Speed};
 pub use engine::{Engine, EngineState};
 pub use generate::{GenRequest, GenResult, Progress};

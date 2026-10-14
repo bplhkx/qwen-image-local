@@ -1,3 +1,5 @@
+mod remote;
+
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLock;
@@ -10,8 +12,13 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
 /// Guard against double generation; released on Drop even if the task fails.
-static BUSY: AtomicBool = AtomicBool::new(false);
+pub(crate) static BUSY: AtomicBool = AtomicBool::new(false);
 static INSTALLING: AtomicBool = AtomicBool::new(false);
+/// Set once the user has confirmed they want to quit, so the second CloseRequested
+/// from `app_exit` is not intercepted again.
+pub(crate) static EXIT_OK: AtomicBool = AtomicBool::new(false);
+/// What the engine last reported, mirrored for the remote API's polling clients.
+static ENGINE_SNAP: std::sync::Mutex<Option<EngineState>> = std::sync::Mutex::new(None);
 struct Flag(&'static AtomicBool);
 impl Drop for Flag {
     fn drop(&mut self) {
@@ -19,7 +26,7 @@ impl Drop for Flag {
     }
 }
 
-struct Settings(RwLock<Config>);
+pub(crate) struct Settings(RwLock<Config>);
 
 fn cfg(s: &State<'_, Settings>) -> Config {
     s.0.read().unwrap().clone()
@@ -96,10 +103,18 @@ async fn pick_folder(app: AppHandle) -> Option<String> {
 
 // ── Engine ──
 
-fn engine_emitter(app: &AppHandle) -> impl Fn(EngineState) + Send + Sync {
+pub(crate) fn engine_emitter(app: &AppHandle) -> impl Fn(EngineState) + Send + Sync {
     let app = app.clone();
     move |s: EngineState| {
+        *ENGINE_SNAP.lock().unwrap() = Some(s.clone());
         let _ = app.emit("engine", s);
+    }
+}
+
+pub(crate) fn engine_snapshot() -> (&'static str, String, bool) {
+    match ENGINE_SNAP.lock().unwrap().as_ref() {
+        Some(s) => (s.state, s.detail.clone(), s.external),
+        None => ("off", String::new(), false),
     }
 }
 
@@ -120,20 +135,32 @@ fn engine_stop(app: AppHandle, engine: State<'_, Engine>) -> bool {
 
 // ── Generation ──
 
-#[tauri::command]
-async fn generate(app: AppHandle, settings: State<'_, Settings>, req: GenRequest) -> Result<GenResult, String> {
+/// One generation, shared by the window and the remote API so both obey the same
+/// single-flight rule and both see the same progress events.
+pub(crate) type ProgressHook = Box<dyn Fn(qil_core::Progress) + Send + Sync>;
+
+pub(crate) async fn run_generation(app: &AppHandle, req: GenRequest, notify: Option<ProgressHook>) -> Result<GenResult, String> {
     if BUSY.swap(true, Ordering::SeqCst) {
         return Err("A generation is already running.".into());
     }
     let _flag = Flag(&BUSY);
-    let c = cfg(&settings);
+    let c = cfg(&app.state::<Settings>());
     if !engine::is_up(&c).await {
         return Err("The engine is off.".into());
     }
+    let a = app.clone();
     let emit = move |p: qil_core::Progress| {
-        let _ = app.emit("gen-progress", p);
+        let _ = a.emit("gen-progress", &p);
+        if let Some(n) = &notify {
+            n(p);
+        }
     };
     generate::run(&c, req, c.output_dir.clone(), &emit).await
+}
+
+#[tauri::command]
+async fn generate(app: AppHandle, req: GenRequest) -> Result<GenResult, String> {
+    run_generation(&app, req, None).await
 }
 
 #[tauri::command]
@@ -290,6 +317,109 @@ fn open_url(app: AppHandle, url: String) -> Result<(), String> {
     app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
 }
 
+/// Removes one generated image and the .json beside it. The path is checked against the
+/// output folder so a bad argument can never delete anything else on the disk.
+#[tauri::command]
+async fn delete_output(settings: State<'_, Settings>, path: String) -> Result<String, String> {
+    let dir = cfg(&settings).output_dir;
+    tauri::async_runtime::spawn_blocking(move || {
+        let root = dir.canonicalize().map_err(|e| format!("Output folder is gone: {e}"))?;
+        let file = PathBuf::from(&path)
+            .canonicalize()
+            .map_err(|_| "That image has already been deleted.".to_string())?;
+        if !file.starts_with(&root) {
+            return Err("Refusing to delete a file outside the output folder.".into());
+        }
+        if !file.extension().is_some_and(|e| e.eq_ignore_ascii_case("png")) {
+            return Err("Only generated PNGs can be deleted here.".into());
+        }
+        let name = file.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        std::fs::remove_file(&file).map_err(|e| format!("Could not delete {name}: {e}"))?;
+        // The sidecar is a nicety: its absence must not make the delete look like it failed.
+        let _ = std::fs::remove_file(file.with_extension("json"));
+        Ok(name)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+// ── Remote access ──
+
+/// 32 hex chars from the OS generator: this guards a listener on every LAN interface.
+fn mint_token() -> String {
+    use rand::Rng;
+    let mut b = [0u8; 16];
+    rand::rngs::OsRng.fill(&mut b);
+    b.iter().map(|x| format!("{x:02x}")).collect()
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RemoteInfo {
+    enabled: bool,
+    port: u16,
+    token: String,
+    urls: Vec<String>,
+    /// The listener is opened once at startup, so these need a restart to change.
+    running: bool,
+}
+
+#[tauri::command]
+fn remote_info(settings: State<'_, Settings>) -> RemoteInfo {
+    let c = cfg(&settings);
+    RemoteInfo {
+        enabled: c.remote.enabled,
+        port: c.remote.port,
+        token: c.remote.token.clone(),
+        urls: remote_lan_urls(c.remote.port),
+        running: c.remote.enabled,
+    }
+}
+
+#[tauri::command]
+fn remote_configure(settings: State<'_, Settings>, enabled: Option<bool>, regenerate: Option<bool>) -> Result<RemoteInfo, String> {
+    let mut c = settings.0.write().unwrap();
+    if let Some(e) = enabled {
+        c.remote.enabled = e;
+    }
+    if regenerate.unwrap_or(false) || c.remote.token.is_empty() {
+        c.remote.token = mint_token();
+    }
+    c.save().map_err(|e| e.to_string())?;
+    let port = c.remote.port;
+    Ok(RemoteInfo { enabled: c.remote.enabled, port, token: c.remote.token.clone(), urls: remote_lan_urls(port), running: c.remote.enabled })
+}
+
+/// The addresses a phone can type, computed the same way the server reports them.
+fn remote_lan_urls(port: u16) -> Vec<String> {
+    let mut out = vec![format!("http://127.0.0.1:{port}")];
+    if let Ok(sock) = std::net::UdpSocket::bind("0.0.0.0:0") {
+        if sock.connect("223.5.5.5:80").is_ok() {
+            if let Ok(addr) = sock.local_addr() {
+                if !addr.ip().is_loopback() {
+                    out.push(format!("http://{}:{port}", addr.ip()));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Quits for real, from the close dialog's confirm button.
+#[tauri::command]
+fn app_exit(app: AppHandle) {
+    EXIT_OK.store(true, Ordering::SeqCst);
+    app.state::<Engine>().stop();
+    app.exit(0);
+}
+
+/// The window's X button asks first instead of closing: the generation and the engine
+/// are both worth a confirm step, and only the webview knows which.
+#[derive(Serialize, Clone)]
+struct CloseAsked {
+    busy: bool,
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
@@ -302,7 +432,28 @@ pub fn run() {
             let out = app.state::<Settings>().0.read().unwrap().output_dir.clone();
             let _ = std::fs::create_dir_all(&out);
             let _ = app.asset_protocol_scope().allow_directory(&out, true);
+            // Remote access comes up with the app: mint a token once, then listen.
+            {
+                let settings = app.state::<Settings>();
+                let mut c = settings.0.write().unwrap();
+                if c.remote.enabled && c.remote.token.is_empty() {
+                    c.remote.token = mint_token();
+                    let _ = c.save();
+                }
+            }
+            remote::spawn(app.handle().clone(), qil_core::remote::new_job());
             Ok(())
+        })
+        // The X button no longer closes the window: it asks the UI for a confirm first.
+        // `app_exit` sets EXIT_OK so the closing the user approved is not blocked again.
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if EXIT_OK.load(Ordering::SeqCst) {
+                    return;
+                }
+                api.prevent_close();
+                let _ = window.emit("close-requested", CloseAsked { busy: BUSY.load(Ordering::SeqCst) });
+            }
         })
         .invoke_handler(tauri::generate_handler![
             setup_status,
@@ -322,6 +473,10 @@ pub fn run() {
             save_edited,
             list_outputs,
             output_dir,
+            delete_output,
+            remote_info,
+            remote_configure,
+            app_exit,
             reveal,
             open_path,
             open_url

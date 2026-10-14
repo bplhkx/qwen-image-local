@@ -69,6 +69,26 @@
       edApply: "Apply", edLoadFail: "Could not open this image.",
       edHint: "Mark the area to change: circles, boxes, arrows or free strokes. Colors tell the model which region is which — describe each mark in the instruction.",
       eventsFail: "Could not register events (check capabilities/default.json): ",
+      // Remote access
+      remoteTitle: "Remote access", remoteEnable: "On",
+      remoteHint: "A phone or another PC on this network can drive the app over these settings. Keep it on a trusted network: the token is the only thing between a stranger and your GPU, your files and your disk.",
+      copy: "Copy", remoteNew: "New token",
+      remoteLive: (n) => `Listening on port ${n}. Restart the app after changing the port.`,
+      remoteOffNote: "Remote access is off. Nothing is listening.", remoteSaved: "Remote settings saved.",
+      // Quit confirmation
+      quitTitle: "Quit Qwen Image Local?", quitBody: "Everything you generated is already saved.",
+      quitBusy: "A generation is still running; quitting interrupts it.", quitEngine: "The engine is up; it stops with the app.",
+      quit: "Quit", stay: "Stay",
+      // History right-click menu
+      menuView: "View full size", menuDelete: "Delete", deleteTitle: "Delete this image?",
+      deleteBody: (n) => `${n} and its settings file are removed from disk. This can't be undone.`,
+      deleted: (n) => `Deleted ${n}.`, gone: "That image is no longer on disk.",
+      // Prompt presets
+      savePreset: "Save preset", presetTitle: "Save as a quick preset", presetName: "Name",
+      presetUse: "Use this preset", presetNeedName: "Give the preset a name.",
+      presetOk: "Save", presetEmpty: "Write something to save first.", presetSaved: (n) => `Saved "${n}".`,
+      presetDel: "Delete preset", presetExists: (n) => `"${n}" already exists — pick another name.`,
+      presetDup: (n) => `That text is already saved as "${n}".`,
     },
     es: {
       openFolder: "Abrir carpeta",
@@ -138,6 +158,26 @@
       edApply: "Aplicar", edLoadFail: "No se pudo abrir esta imagen.",
       edHint: "Marcá la zona a cambiar: círculos, cajas, flechas o trazos libres. Los colores le dicen al modelo qué región es cuál — describí cada marca en la instrucción.",
       eventsFail: "No se pudieron registrar los eventos (revisá capabilities/default.json): ",
+      // Acceso remoto
+      remoteTitle: "Acceso remoto", remoteEnable: "Activo",
+      remoteHint: "Un teléfono u otra PC de esta red puede manejar la app con estos ajustes. Mantenlo en una red de confianza: la clave es lo único que separa a un desconocido de tu GPU, tus archivos y tu disco.",
+      copy: "Copiar", remoteNew: "Clave nueva",
+      remoteLive: (n) => `Escuchando en el puerto ${n}. Reiniciá la app si cambiás el puerto.`,
+      remoteOffNote: "El acceso remoto está apagado. No hay nada escuchando.", remoteSaved: "Ajustes remotos guardados.",
+      // Confirmación de salida
+      quitTitle: "¿Salir de Qwen Image Local?", quitBody: "Todo lo que generaste ya está guardado.",
+      quitBusy: "Todavía hay una generación en curso; salir la interrumpe.", quitEngine: "El motor está activo; se apaga con la app.",
+      quit: "Salir", stay: "Quedarme",
+      // Menú del historial
+      menuView: "Ver a tamaño completo", menuDelete: "Eliminar", deleteTitle: "¿Eliminar esta imagen?",
+      deleteBody: (n) => `${n} y su archivo de ajustes se borran del disco. No se puede deshacer.`,
+      deleted: (n) => `Eliminaste ${n}.`, gone: "Esta imagen ya no está en el disco.",
+      // Presets de prompt
+      savePreset: "Guardar preset", presetTitle: "Guardar como preset rápido", presetName: "Nombre",
+      presetUse: "Usar este preset", presetNeedName: "Ponele un nombre al preset.",
+      presetOk: "Guardar", presetEmpty: "Escribí algo para guardar primero.", presetSaved: (n) => `Guardado "${n}".`,
+      presetDel: "Borrar preset", presetExists: (n) => `"${n}" ya existe; elegí otro nombre.`,
+      presetDup: (n) => `Ese texto ya está guardado como "${n}".`,
     },
     zh: {
       openFolder: "打开文件夹",
@@ -207,6 +247,26 @@
       edApply: "应用", edLoadFail: "无法打开这张图片",
       edHint: "圈出要修改的位置：圆圈、方框、箭头或随手涂抹。不同颜色代表不同区域，记得在指令里说清楚每一处要改成什么。",
       eventsFail: "无法注册事件（请检查 capabilities/default.json）：",
+      // 远程访问
+      remoteTitle: "远程访问", remoteEnable: "开启",
+      remoteHint: "同一局域网里的手机或其他电脑可以凭这些设置操作本应用。请只在可信网络开启：这个令牌是唯一挡在陌生人与你的显卡、文件、磁盘之间的东西。",
+      copy: "复制", remoteNew: "换一个令牌",
+      remoteLive: (n) => `正在 ${n} 端口监听。改了端口要重启应用才生效。`,
+      remoteOffNote: "远程访问已关闭，当前没有监听。", remoteSaved: "远程访问设置已保存。",
+      // 关闭确认
+      quitTitle: "退出 Qwen Image Local？", quitBody: "已生成的图片都保存好了。",
+      quitBusy: "还有图片正在生成，退出会中断它。", quitEngine: "引擎正在运行，退出时会一并关闭。",
+      quit: "退出", stay: "取消",
+      // 历史右键菜单
+      menuView: "查看大图", menuDelete: "删除", deleteTitle: "删除这张图片？",
+      deleteBody: (n) => `将从磁盘删除 ${n} 和它的参数文件，此操作无法撤销。`,
+      deleted: (n) => `已删除 ${n}。`, gone: "这张图片已经不在磁盘上了。",
+      // 指令预设
+      savePreset: "存为预设", presetTitle: "保存为快捷预设", presetName: "名称",
+      presetUse: "载入这个预设", presetNeedName: "给预设起个名字。",
+      presetOk: "保存", presetEmpty: "先写点内容再保存。", presetSaved: (n) => `已保存为「${n}」。`,
+      presetDel: "删除预设", presetExists: (n) => `已有同名预设「${n}」，换一个名字。`,
+      presetDup: (n) => `这段内容已经存为「${n}」了。`,
     },
   };
 
@@ -238,6 +298,7 @@
       root.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = this.t(el.dataset.i18n); });
       root.querySelectorAll("[data-i18n-html]").forEach((el) => { el.innerHTML = this.t(el.dataset.i18nHtml); });
       root.querySelectorAll("[data-i18n-ph]").forEach((el) => { el.placeholder = this.t(el.dataset.i18nPh); });
+      root.querySelectorAll("[data-i18n-title]").forEach((el) => { el.title = this.t(el.dataset.i18nTitle); });
       document.querySelectorAll("[data-lang]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
       window.dispatchEvent(new Event("langchange"));
     },

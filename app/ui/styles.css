@@ -335,8 +335,7 @@ input.mono { font-family: var(--font-mono); font-size: 12px; }
 .setup-head p { margin-top: 4px; max-width: 62ch; }
 .setup-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 28px; flex: 1; }
 .setup-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-.setup-col .grow { flex: 1; }
-.gpu-card { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
+.setup-col .gpu-card { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
 .gpu-card strong { font-weight: 600; }
 .gpu-card .mono { color: var(--text-muted); }
 .rec { font: 500 11.5px var(--font-sans); color: var(--ok); margin-left: 6px; }
@@ -382,3 +381,45 @@ input.mono { font-family: var(--font-mono); font-size: 12px; }
 .ed-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: auto; background: repeating-conic-gradient(var(--check-a) 0 25%, var(--check-b) 0 50%) 0 0 / 16px 16px; }
 .ed-wrap canvas { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 8px 28px rgba(0, 0, 0, 0.10); }
 .ed-hint { padding: 6px 14px; border-top: 1px solid var(--border); background: var(--panel); color: var(--text-muted); font-size: 12px; }
+
+/* ── Overlays: confirm dialog and right-click menu ── */
+.modal {
+  position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
+  background: rgba(20, 20, 21, 0.34); padding: 24px;
+}
+.modal-card {
+  width: min(440px, 100%); max-height: calc(100vh - 56px); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 9px; padding: 18px 20px;
+  background: var(--panel); border: 1px solid var(--border-strong); border-radius: var(--r);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.22);
+}
+.modal-title { font-size: 14.5px; font-weight: 600; letter-spacing: -0.01em; }
+.modal-text { font-size: 12.5px; color: var(--text-muted); }
+.modal-form { display: flex; flex-direction: column; gap: 8px; }
+.modal-actions { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+
+/* Buttons squeezed into a section header */
+.mini-actions { display: flex; gap: 4px; }
+
+/* Saved prompt chips */
+.chip { display: inline-flex; align-items: stretch; border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; background: var(--panel); }
+.chip:hover { border-color: var(--border-strong); }
+.chip-name { border: 0; background: transparent; color: var(--text); font: 500 11.5px var(--font-sans); padding: 3px 2px 3px 8px; cursor: pointer; max-width: 190px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip-name:hover { background: var(--hover); }
+.chip-x { border: 0; border-left: 1px solid var(--border); background: transparent; color: var(--text-faint); font: 400 13px/1 var(--font-sans); padding: 2px 6px 3px; cursor: pointer; }
+.chip-x:hover { background: var(--err-bg); color: var(--err); }
+
+/* Right-click menu */
+.ctxmenu {
+  position: fixed; z-index: 60; min-width: 186px; padding: 3px;
+  display: flex; flex-direction: column; gap: 1px;
+  background: var(--panel); border: 1px solid var(--border-strong); border-radius: var(--r);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+}
+.ctxmenu button {
+  border: 0; background: transparent; text-align: left; color: var(--text);
+  font: 400 12.5px var(--font-sans); padding: 7px 10px; border-radius: var(--r-sm); cursor: pointer;
+}
+.ctxmenu button:hover { background: var(--hover); }
+.ctxmenu button.danger { color: var(--err); }
+.ctxmenu button.danger:hover { background: var(--err-bg); }

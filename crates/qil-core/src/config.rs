@@ -255,6 +255,31 @@ pub struct Config {
     pub output_dir: PathBuf,
     #[serde(default = "default_port")]
     pub port: u16,
+    /// The LAN remote-access API the desktop app serves next to the engine.
+    #[serde(default)]
+    pub remote: Remote,
+}
+
+/// Settings for the built-in remote access server (`remote.rs` in the desktop app).
+/// Enabled by default: the phone client only needs the URL and the token.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Remote {
+    pub enabled: bool,
+    /// Separate from `port` on purpose: 8188 is ComfyUI, this is our own API.
+    pub port: u16,
+    /// Empty until the app generates one on first start.
+    pub token: String,
+}
+
+fn default_remote_port() -> u16 {
+    8199
+}
+
+impl Default for Remote {
+    fn default() -> Self {
+        Remote { enabled: true, port: default_remote_port(), token: String::new() }
+    }
 }
 
 fn default_port() -> u16 {
@@ -282,6 +307,7 @@ impl Default for Config {
                 .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("Pictures"))
                 .join("Qwen Image Local"),
             port: default_port(),
+            remote: Remote::default(),
         }
     }
 }
@@ -311,7 +337,34 @@ impl Config {
         if let Some(dir) = p.parent() {
             std::fs::create_dir_all(dir)?;
         }
-        std::fs::write(p, serde_json::to_vec_pretty(self).expect("config serializes"))
+        // Read the file back first: a dev override must not become permanent.
+        let on_disk = std::fs::read(&p).ok().and_then(|b| serde_json::from_slice::<Config>(&b).ok());
+        let out = self.without_env_overrides(
+            on_disk.as_ref(),
+            std::env::var_os("QIL_RUNTIME").is_some(),
+            std::env::var_os("QIL_MODELS").is_some(),
+        );
+        std::fs::write(p, serde_json::to_vec_pretty(&out).expect("config serializes"))
+    }
+
+    /// `QIL_RUNTIME` / `QIL_MODELS` replace paths *in memory* so a dev or CI run can use a
+    /// throwaway folder. Saving must keep the on-disk values for exactly those two keys,
+    /// or the override leaks into a real install and points it at an empty folder.
+    /// Pure, so the rule is testable without touching the user's config.
+    pub fn without_env_overrides(&self, on_disk: Option<&Config>, runtime_overridden: bool, models_overridden: bool) -> Config {
+        match on_disk {
+            Some(prev) if runtime_overridden || models_overridden => {
+                let mut out = self.clone();
+                if runtime_overridden {
+                    out.runtime_dir = prev.runtime_dir.clone();
+                }
+                if models_overridden {
+                    out.models_dir = prev.models_dir.clone();
+                }
+                out
+            }
+            _ => self.clone(),
+        }
     }
 
     /// The three weights this config needs: selected DiT + profile encoder + VAE.
@@ -414,5 +467,52 @@ mod tests {
         let c: Config = serde_json::from_str(old).unwrap();
         assert_eq!(c.speed, Speed::Base);
         assert_eq!(c.models()[0].name, DIT_UC.name);
+    }
+
+    #[test]
+    fn a_dev_path_override_never_reaches_the_disk() {
+        // The bug this guards: running under QIL_MODELS and then saving used to write the
+        // throwaway folder into the real config, pointing the install at an empty disk.
+        let saved = Config {
+            runtime_dir: PathBuf::from(r"C:\Users\me\AppData\Local\qwen-image-local"),
+            models_dir: PathBuf::from(r"E:\AI\models"),
+            dit: Dit::Uncensored,
+            ..Config::default()
+        };
+        let running = Config {
+            runtime_dir: PathBuf::from(r"E:\tmp\qil-sandbox"),
+            models_dir: PathBuf::from(r"E:\tmp\qil-sandbox\models"),
+            dit: Dit::Uncensored,
+            ..Config::default()
+        };
+
+        // Both overridden: neither sandbox path survives the save.
+        let out = running.without_env_overrides(Some(&saved), true, true);
+        assert_eq!(out.runtime_dir, saved.runtime_dir);
+        assert_eq!(out.models_dir, saved.models_dir);
+        // A real change the user made in the same save still goes through.
+        assert_eq!(out.dit, Dit::Uncensored);
+
+        // Only one overridden: the other keeps the new value.
+        let out = running.without_env_overrides(Some(&saved), false, true);
+        assert_eq!(out.runtime_dir, running.runtime_dir);
+        assert_eq!(out.models_dir, saved.models_dir);
+
+        // No override, or nothing on disk yet: save as-is.
+        assert_eq!(running.without_env_overrides(Some(&saved), false, false).models_dir, running.models_dir);
+        assert_eq!(running.without_env_overrides(None, true, true).models_dir, running.models_dir);
+    }
+
+    #[test]
+    fn remote_defaults_on_with_no_token_until_first_start() {
+        // An older config.json has no "remote" key: the server must still come up,
+        // on its own port, with an empty token the app fills in on first run.
+        let old = r#"{"runtimeDir":"r","modelsDir":"m","outputDir":"o","port":8188}"#;
+        let c: Config = serde_json::from_str(old).unwrap();
+        assert!(c.remote.enabled);
+        assert_eq!(c.remote.port, 8199);
+        assert!(c.remote.token.is_empty());
+        // The remote port is never the engine port: both listen on this machine.
+        assert_ne!(c.remote.port, c.port);
     }
 }
