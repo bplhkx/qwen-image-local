@@ -32,6 +32,9 @@
     history: [],
     lastIdea: null,
     stepTimes: [],
+    batch: { total: 1, done: 0, steps: 0, value: 0 }, // one bar across the whole batch
+    viewPinned: false, // user chose a picture mid-run: later ones only go to history
+    lastSampleSecs: 0, // per picture, for the batch estimate
     setup: null, // SetupInfo from Rust
     installing: false,
     stepState: {}, // id -> {state, detail, done, total, bps}
@@ -391,9 +394,8 @@
   $("cfg").addEventListener("input", () => { renderGuidance(); saveGuidance(); });
   $("cfg").addEventListener("blur", () => { $("cfg").value = String(cfgValue()); saveGuidance(); });
   $("negative").addEventListener("input", () => { renderGuidance(); saveGuidance(); });
-  $("cfg25").addEventListener("click", () => { $("cfg").value = "2.5"; renderGuidance(); saveGuidance(); $("advBox").open = true; });
+  $("cfg25").addEventListener("click", () => { $("cfg").value = "2.5"; renderGuidance(); saveGuidance(); });
   $("cfg10").addEventListener("click", () => { $("cfg").value = "1"; renderGuidance(); saveGuidance(); });
-  $("advBox").addEventListener("toggle", (e) => localSet("advOpen", e.target.open ? "1" : "0"));
   function renderNegQuick() {
     const box = $("negQuick");
     box.innerHTML = "";
@@ -414,10 +416,23 @@
   function initGuidance() {
     $("cfg").value = localGet("cfg", "1");
     $("negative").value = localGet("negative", "");
-    $("advBox").open = localGet("advOpen", "0") === "1";
+    $("batch").value = localGet("batch", "1");
     renderNegQuick();
     renderGuidance();
+    renderBatch();
   }
+
+  // Batch: how many pictures one press produces. The seeds walk forward from the
+  // locked one, so a batch with the seed pinned is still reproducible.
+  function batchCount() { return Math.min(10, Math.max(1, Number($("batch").value) || 1)); }
+  function renderBatch() {
+    const n = batchCount();
+    localSet("batch", String(n));
+    const secs = state.lastSampleSecs;
+    $("batchEta").textContent = n > 1 && secs ? `≈ ${fmtSecs(Math.round(secs * n))}` : "";
+    updateGenButton();
+  }
+  $("batch").addEventListener("change", renderBatch);
 
   // References
   async function addRefs(paths) {
@@ -503,6 +518,8 @@
     else if (!currentPrompt()) { label = state.mode === "photos" ? t("needInstr") : t("needDesc"); ok = false; }
     else if (state.mode === "surprise") label = t("genSurprise");
     else if (state.mode === "photos") label = state.refs.length > 1 ? t("genWith", state.refs.length) : t("genEdit");
+    // The mode wording stays; the batch rides on the end of it.
+    if (ok && batchCount() > 1) label += ` ×${batchCount()}`;
     btn.textContent = label;
     btn.disabled = !ok;
     $("cancelBtn").hidden = !state.busy;
@@ -546,7 +563,7 @@
     $("gpuStat").title = `VRAM ${pct}% · GPU ${g.util}%`;
   }
 
-  // Generate
+  // Generate — one press can produce a batch; every picture is its own engine job.
   async function generate() {
     if ($("genBtn").disabled) return;
     let prompt = currentPrompt();
@@ -559,35 +576,50 @@
       $("idea").hidden = false;
       $("ideaTxt").textContent = prompt;
     }
-    const seed = $("seedLock").checked && $("seed").value ? Number($("seed").value) : null;
-    const req = {
+    const seedBase = $("seedLock").checked && $("seed").value ? Number($("seed").value) : null;
+    const total = batchCount();
+    const base = {
       mode: state.mode,
       prompt,
       images: state.mode === "photos" ? state.refs.map((r) => r.path) : [],
       preset: state.preset,
       aspect,
-      seed,
       transparent: state.mode === "text" && $("transparent").checked,
       negative: $("negative").value.trim(),
       cfg: cfgValue(),
     };
     state.busy = true;
     state.stepTimes = [];
+    state.viewPinned = false; // the run owns the viewer until the user picks another picture
+    state.batch = { total, done: 0, steps: 0, value: 0 };
     hideNotice();
     showWorking("load", 0, 0);
     updateGenButton();
     renderEngine();
+    let made = 0;
     try {
-      const r = await invoke("generate", { req });
-      const item = { path: r.path, meta: { ...req, seed: r.seed, width: r.width, height: r.height, seconds: r.seconds, references: req.images } };
-      state.history.unshift(item);
-      showImage(item);
-      renderHistory();
+      for (let i = 0; i < total; i++) {
+        state.batch.done = i;
+        const req = { ...base, seed: seedBase == null ? null : seedBase + i };
+        if (i > 0) { state.stepTimes = []; showWorking("load", 0, 0); }
+        const r = await invoke("generate", { req });
+        made++;
+        state.lastSampleSecs = r.sampleSeconds || r.seconds || 0;
+        const item = { path: r.path, meta: { ...req, seed: r.seed, width: r.width, height: r.height, seconds: r.seconds, references: req.images } };
+        state.history.unshift(item);
+        if (!state.viewPinned) showImage(item);
+        renderHistory();
+        renderBatch();
+      }
+      if (total > 1) notify(t("batchDone", total), true);
     } catch (e) {
       const msg = String(e);
-      if (msg === "Cancelled") notify(t("cancelled"), true); else notify(msg);
+      // Cancel stops the whole batch, not just the picture in flight.
+      if (msg === "Cancelled") notify(total > 1 && made ? t("batchStopped", made, total) : t("cancelled"), true);
+      else notify(msg);
     } finally {
       state.busy = false;
+      state.batch = { total: 1, done: 0, steps: 0, value: 0 };
       hideWorking();
       updateGenButton();
       renderEngine();
@@ -596,31 +628,33 @@
   $("genBtn").addEventListener("click", generate);
   $("cancelBtn").addEventListener("click", () => { $("cancelBtn").disabled = true; invoke("cancel"); });
 
+  // The bar spans the batch: finished pictures + the fraction of this one.
   function showWorking(stage, value, max) {
-    $("working").hidden = false;
-    $("shot").classList.add("dim");
-    $("empty").hidden = true;
-    $("wStage").textContent = t(STAGE_KEY[stage] || "stSample");
-    const bar = $("progress");
-    bar.classList.add("visible");
+    const bar = $("genbar");
+    bar.hidden = false;
+    const b = state.batch;
+    $("wStage").textContent = t(STAGE_KEY[stage] || "stSample") + (b.total > 1 ? ` · ${t("batchOf", b.done + 1, b.total)}` : "");
+    const fill = $("progressFill");
     if (stage === "sample" && max > 0) {
       bar.classList.remove("indeterminate");
-      $("progressFill").style.width = Math.round((value / max) * 100) + "%";
+      b.steps = max; b.value = value;
+      const frac = (b.done + Math.min(1, value / max)) / b.total;
+      fill.style.width = Math.round(frac * 100) + "%";
       state.stepTimes.push(performance.now());
       const ts = state.stepTimes.slice(-6);
       const spi = ts.length > 1 ? (ts[ts.length - 1] - ts[0]) / (ts.length - 1) / 1000 : 0;
-      const left = spi ? Math.max(0, Math.round((max - value) * spi)) : null;
-      $("wStep").textContent = t("step", value, max) + (spi ? ` · ${spi.toFixed(1)} ${t("perStep")} · ${fmtSecs(left)} ${t("left")}` : "");
+      const left = spi ? Math.max(0, Math.round(((b.total - b.done - 1) * max + (max - value)) * spi)) : null;
+      $("wStep").textContent = `${value}/${max}` + (b.total > 1 ? ` · ${b.done}/${b.total}` : "")
+        + (spi ? ` · ${spi.toFixed(1)} ${t("perStep")} · ${fmtSecs(left)} ${t("left")}` : "");
     } else {
       bar.classList.add("indeterminate");
-      $("progressFill").style.width = "";
+      fill.style.width = "";
       $("wStep").textContent = stage === "load" ? t("firstSlow") : "";
     }
   }
   function hideWorking() {
-    $("working").hidden = true;
-    $("shot").classList.remove("dim");
-    $("progress").classList.remove("visible", "indeterminate");
+    $("genbar").hidden = true;
+    $("genbar").classList.remove("indeterminate");
     $("progressFill").style.width = "0";
     $("cancelBtn").disabled = false;
     if ($("shot").hidden) $("empty").hidden = false;
@@ -647,6 +681,7 @@
     $("infoMeta").textContent = parts.join(" · ");
     $("aSeed").disabled = m.seed == null;
     $("aCopy").disabled = !m.prompt;
+    $("aReuse").disabled = !m.prompt;
     document.querySelectorAll(".hist").forEach((h) => h.setAttribute("aria-current", String(h.dataset.path === item.path)));
   }
   function renderHistory() {
@@ -661,7 +696,7 @@
       b.title = item.meta?.prompt || "";
       b.setAttribute("aria-current", String(state.current?.path === item.path));
       b.innerHTML = `<img loading="lazy" decoding="async" src="${fileSrc(item.path)}" alt="">`;
-      b.addEventListener("click", () => showImage(item));
+      b.addEventListener("click", () => { state.viewPinned = state.busy; showImage(item); });
       b.addEventListener("contextmenu", (e) => {
         e.preventDefault();
         showImage(item);
@@ -680,6 +715,23 @@
   }
 
   $("aCopy").addEventListener("click", () => copyText(state.current?.meta?.prompt));
+  // Reuse puts the picture's own prompts back into the boxes, so the CFG has to come
+  // with it: a negative pasted in at CFG 1 would be a field that silently does nothing.
+  // Old sidecars have no `negative` key at all — those leave the box alone rather than
+  // wiping what the user typed.
+  $("aReuse").addEventListener("click", () => {
+    const m = state.current?.meta;
+    if (!m?.prompt) return;
+    const box = state.mode === "photos" ? "promptPhotos" : "promptText";
+    $(box).value = m.prompt;
+    if (typeof m.negative === "string") $("negative").value = m.negative;
+    if (typeof m.cfg === "number") $("cfg").value = String(clampCfgUI(m.cfg));
+    renderGuidance(); saveGuidance(); updateGenButton();
+    const cfg = cfgValue();
+    notify(t("reuseDone", t(state.mode === "photos" ? "instruction" : "description"), cfg, $("negative").value.trim() ? 1 : 0), true);
+  });
+  function clampCfgUI(v) { return Number.isFinite(v) ? Math.min(10, Math.max(1, v)) : 1; }
+
   $("aSeed").addEventListener("click", () => {
     const s = state.current?.meta?.seed;
     if (s == null) return;

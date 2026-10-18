@@ -61,6 +61,7 @@ Qwen-Image-2.1 came out on September 20, 2026. It is the first open-weight image
 | | Feature | Details |
 |---|---|---|
 | **Create** | Text → image | Draft 1024² · Standard 1.6 MP · Max native 2K, seven aspect ratios, lockable seed |
+| **Batch** | 1–10 pictures per press | A copies picker by the Generate button; with the seed locked the batch walks forward from it, so it stays reproducible. One bar across the whole batch, and 取消 stops what is left |
 | **Speed** | Turbo tier | Distilled 8-step checkpoint, about 3–4× faster sampling; pick it on top of any VRAM profile |
 | **Model** | Official or Uncensored | Swap the image model from the setup screen or the main UI; the encoder and VAE are shared, so it is one file |
 | **Transparency** | Native RGBA | Real alpha channel from the model, no background-removal tricks |

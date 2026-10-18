@@ -174,6 +174,26 @@
           </div>
         </section>
 
+        <!-- Sits right under whichever prompt box is on screen, so the negative reads as
+             the other half of the same field. -->
+        <section class="group">
+          <div class="label-row">
+            <label class="label" for="negative" data-i18n="negLabel"></label>
+            <span class="adv-state" id="advState"></span>
+          </div>
+          <textarea id="negative" class="neg" rows="3" spellcheck="false" data-i18n-ph="negPh"></textarea>
+          <div class="quick" id="negQuick"></div>
+          <div class="label-row">
+            <label class="label" for="cfg"><span data-i18n="cfgLabel"></span> <span class="muted" data-i18n="cfgRange"></span></label>
+            <div class="mini-actions">
+              <button type="button" class="btn btn-xs" id="cfg25" data-i18n="cfg25"></button>
+              <button type="button" class="btn btn-xs" id="cfg10" data-i18n="cfg10"></button>
+            </div>
+          </div>
+          <input id="cfg" type="number" min="1" max="10" step="0.1" class="mono" value="1">
+          <p class="hint" id="cfgNote"></p>
+        </section>
+
         <section class="group">
           <span class="label" data-i18n="genModel"></span>
           <div class="presets" id="ditsMain" role="radiogroup">
@@ -232,31 +252,6 @@
         </section>
 
         <section class="group">
-          <details id="advBox">
-            <summary class="adv-head">
-              <span class="label" data-i18n="advTitle"></span>
-              <span class="adv-state" id="advState"></span>
-            </summary>
-            <div class="adv-body">
-              <div class="label-row">
-                <label class="label" for="cfg" data-i18n="cfgLabel"></label>
-                <span class="mono muted" data-i18n="cfgRange"></span>
-              </div>
-              <div class="adv-cfg">
-                <input id="cfg" type="number" min="1" max="10" step="0.1" class="mono" value="1">
-                <button type="button" class="btn btn-xs" id="cfg25" data-i18n="cfg25"></button>
-                <button type="button" class="btn btn-xs" id="cfg10" data-i18n="cfg10"></button>
-              </div>
-              <p class="hint" id="cfgNote"></p>
-              <label class="label" for="negative" data-i18n="negLabel"></label>
-              <textarea id="negative" rows="3" spellcheck="false" data-i18n-ph="negPh"></textarea>
-              <div class="quick" id="negQuick"></div>
-              <p class="hint" data-i18n="negCost"></p>
-            </div>
-          </details>
-        </section>
-
-        <section class="group">
           <div class="label-row">
             <label class="label" for="seed" data-i18n="seed"></label>
             <label class="check check-sm"><input type="checkbox" id="seedLock"> <span data-i18n="lock"></span></label>
@@ -284,6 +279,14 @@
       </div>
 
       <div class="panel-foot">
+        <div class="foot-row">
+          <label class="label" for="batch" data-i18n="batchLabel"></label>
+          <select id="batch" class="mono">
+            <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
+            <option value="5">5</option><option value="6">6</option><option value="8">8</option><option value="10">10</option>
+          </select>
+          <span class="hint" id="batchEta"></span>
+        </div>
         <button type="button" class="btn btn-primary btn-block" id="genBtn" disabled></button>
         <button type="button" class="btn btn-block" id="cancelBtn" data-i18n="cancel" hidden></button>
         <p class="kbd mono" data-i18n="kbd"></p>
@@ -291,16 +294,17 @@
     </aside>
 
     <main class="stage">
-      <div class="progress" id="progress"><div class="progress-fill" id="progressFill"></div></div>
       <div class="viewer" id="viewer">
         <div class="empty" id="empty">
           <p class="empty-title" data-i18n="emptyTitle"></p>
           <p class="muted"><span data-i18n="emptyText"></span> <span class="mono" id="outDirTxt"></span></p>
         </div>
         <img id="shot" alt="" hidden>
-        <div class="working" id="working" hidden>
-          <p class="w-stage" id="wStage"></p>
-          <p class="w-step mono" id="wStep"></p>
+        <!-- Pinned over the top edge of the viewer and click-through: the picture stays
+             browsable while the sampler runs. -->
+        <div class="genbar" id="genbar" hidden>
+          <div class="genbar-text"><span id="wStage"></span><span class="mono" id="wStep"></span></div>
+          <div class="genbar-track"><div class="genbar-fill" id="progressFill"></div></div>
         </div>
       </div>
       <div class="notice" id="notice" hidden><span id="noticeTxt"></span><button type="button" class="btn btn-xs" id="noticeClose" data-i18n="close"></button></div>
@@ -311,6 +315,7 @@
         </div>
         <div class="info-actions">
           <button type="button" class="btn btn-sm" id="aCopy" data-i18n="copyPrompt"></button>
+          <button type="button" class="btn btn-sm" id="aReuse" data-i18n="reusePrompt"></button>
           <button type="button" class="btn btn-sm" id="aSeed" data-i18n="useSeed"></button>
           <button type="button" class="btn btn-sm" id="aEdit" data-i18n="editThis"></button>
           <button type="button" class="btn btn-sm" id="aReveal" data-i18n="showInFolder"></button>

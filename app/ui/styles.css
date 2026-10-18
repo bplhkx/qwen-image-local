@@ -245,11 +245,6 @@ input.mono { font-family: var(--font-mono); font-size: 12px; }
 
 /* ── Escenario ── */
 .stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; position: relative; }
-.progress { height: 2px; flex-shrink: 0; background: transparent; }
-.progress.visible { background: var(--border); }
-.progress-fill { height: 100%; width: 0; background: var(--text); transition: width 0.3s ease; }
-.progress.indeterminate .progress-fill { width: 30%; animation: slide 1.1s ease-in-out infinite; }
-@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
 
 .viewer {
   flex: 1; min-height: 0; position: relative; display: flex; align-items: center; justify-content: center;
@@ -261,17 +256,21 @@ input.mono { font-family: var(--font-mono); font-size: 12px; }
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 8px 28px rgba(0, 0, 0, 0.08);
   cursor: zoom-in;
 }
-.viewer img.dim { opacity: 0.35; filter: grayscale(0.4); transition: opacity 0.2s; }
 .empty { text-align: center; max-width: 380px; display: grid; gap: 6px; }
 .empty-title { font-size: 15px; font-weight: 600; }
 
-.working {
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  background: var(--panel); border: 1px solid var(--border); border-radius: var(--r);
-  padding: 14px 20px; min-width: 260px; text-align: center; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
+/* Generation progress: an overlay bar, never a curtain over the picture. */
+.genbar {
+  position: absolute; left: 0; right: 0; top: 0; pointer-events: none;
+  padding: 8px 12px 10px; background: linear-gradient(var(--bg) 62%, rgba(0, 0, 0, 0));
 }
-.w-stage { font-weight: 600; font-size: 13.5px; }
-.w-step { color: var(--text-muted); margin-top: 2px; }
+.genbar-text { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 12.5px; }
+.genbar-text #wStage { font-weight: 600; }
+.genbar-text #wStep { color: var(--text-muted); font-size: 11.5px; }
+.genbar-track { height: 4px; margin-top: 6px; border-radius: 2px; background: var(--border); overflow: hidden; }
+.genbar-fill { height: 100%; width: 0; border-radius: 2px; background: var(--text); transition: width 0.3s ease; }
+.genbar.indeterminate .genbar-fill { width: 22%; animation: slide 1.1s ease-in-out infinite; }
+@keyframes slide { from { transform: translateX(-110%); } to { transform: translateX(460%); } }
 
 .notice {
   flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -359,18 +358,21 @@ input.mono { font-family: var(--font-mono); font-size: 12px; }
 .setup-foot .hint { max-width: 60ch; }
 .btn-wide { height: 38px; min-width: 220px; font-size: 13px; }
 
-/* Guidance (negative prompt + CFG): collapsed, because at CFG 1 it does nothing. */
-#advBox { border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
-.adv-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; padding: 8px 10px; list-style: none; }
-.adv-head::-webkit-details-marker { display: none; }
-.adv-head::before { content: "+"; font: 400 13px/1 var(--font-mono); color: var(--text-faint); margin-right: 2px; }
-#advBox[open] .adv-head::before { content: "−"; }
+/* Guidance: the negative prompt lives with the positive one, so only its state badge is colored. */
 .adv-state { font: 11.5px var(--font-mono); color: var(--text-faint); }
 .adv-state.on { color: var(--pend); }
-.adv-body { display: flex; flex-direction: column; gap: 8px; padding: 0 10px 10px; border-top: 1px solid var(--border); margin-top: 2px; padding-top: 10px; }
-.adv-cfg { display: flex; align-items: center; gap: 6px; }
-.adv-cfg input { width: 74px; }
 #cfgNote.warn { color: var(--err); }
+textarea.neg { min-height: 62px; }
+#cfg { width: 100%; }
+
+/* Panel footer: the batch picker shares the row with its own estimate. */
+.foot-row { display: flex; align-items: center; gap: 8px; }
+.foot-row select {
+  height: 26px; padding: 0 6px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--panel); color: var(--text); font: 12px var(--font-mono); cursor: pointer;
+}
+.foot-row select:hover { border-color: var(--border-strong); }
+.foot-row .hint { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 900px) { .setup-grid { grid-template-columns: 1fr; } }
 
 /* ── Image editor ── */
