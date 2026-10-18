@@ -67,6 +67,7 @@ Qwen-Image-2.1 came out on September 20, 2026. It is the first open-weight image
 | **Edit** | 1–10 reference photos | Relight, restyle, remove objects or people, rewrite signs, combine subjects; the first photo is the canvas |
 | **Annotate** | Markup editor | Draw, circle, box, arrow, erase or crop a reference photo before it goes in; undo, zoom and 90° rotation included |
 | **Surprise me** | Idea generator | Style × subject × place × light, or a curated idea; optional theme |
+| **Control** | Negative prompt + CFG | Off by default: CFG 1 is the model's fast single-conditioning path. Raise CFG above 1 and the negative text is actually subtracted from the result — about twice the sampling time, so it is opt-in and the UI says so |
 | **Setup** | One-command build + one-time install | Pinned ComfyUI, Python 3.12, PyTorch CUDA 13, weights with resume and SHA-256 checks |
 | **CLI** | `qil` | `doctor` · `setup` · `generate` · `edit` · `surprise` · `bench` · `config` |
 | **Privacy** | Local | Prompts and photos only ever go to the engine on `127.0.0.1`. Every image is saved with a `.json` of its prompt, seed and settings |
@@ -209,6 +210,7 @@ qil generate "a mate gourd sticker" --transparent --aspect 1:1
 qil edit "Change the scene to a snowy night" -i street.jpg --preset standard
 qil edit "Put the dog from <image2> next to the bike in <image1>" -i bike.jpg -i dog.jpg
 qil surprise --theme capybaras
+qil generate "a red fox asleep in the snow" --negative "blurry, watermark, extra legs" --cfg 2.5   # guidance costs ~2× the sampling time
 qil bench --suite bench/suite.json --preset max       # reproduce the published benchmark
 ```
 

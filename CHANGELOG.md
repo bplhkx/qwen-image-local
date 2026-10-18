@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1 (in progress, not released yet)
+
+- **Negative prompt and CFG.** A collapsed "Negative prompt & guidance" block sits under the format picker: a negative text box, three shortcut chips, and a CFG field (1–10) with one-click 2.5 / back-to-1. It is off by default, because at CFG 1 — the official Qwen path — the model never reads the negative conditioning, and the panel says exactly that in the warning shown the moment you type something with CFG still at 1. Raising CFG costs a second conditioning pass per step: measured on an RTX 4060, 20 steps at 1024² went from 1.6 s/step to 3.0 s/step. Same seed, same prompt, only the negative swapped: `warm colors, red, orange` came out cool (R−B +9.5), `cool colors, blue, cyan` came out amber (R−B +55.8), and 100% of pixels differed — while the same pair at CFG 1 was pixel-for-pixel the same scene.
+- The same two fields go through every entry point: `qil generate --negative "…" --cfg 2.5`, the desktop panel, and `POST /api/generate` (both optional, so existing remote clients keep the CFG 1 path). The `.json` sidecar records `negative` and `cfg`, and the info line under the image shows `cfg 2.5 · −` when guidance was used.
+
 ## 0.4.0 — 2026-10-14
 
 - **Remote access.** The app now opens a LAN HTTP API on its own port (8199) as soon as it starts, so a phone or another PC can drive it: check the engine, start and stop it, read the history, fetch full images and thumbnails, upload reference photos, delete an output, change the model and speed, and run generations while polling for progress. A bearer token is generated on first launch and shown, with the addresses to type, in a new "Remote access" section of the panel. Everything is limited to the output folder — path checks resolve symlinks and `..` before comparing — and uploaded references have to decode as real images before the generator will accept them. See `GET /api/ping` for the endpoint list.

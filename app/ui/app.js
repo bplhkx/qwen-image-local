@@ -362,6 +362,63 @@
   });
   $("seed").addEventListener("input", (e) => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 15); });
 
+  // Guidance (negative prompt + CFG). CFG 1.0 is the model's official path: the negative
+  // conditioning is computed but never used, so we say so instead of pretending otherwise.
+  const NEG_QUICK = [
+    ["negqQuality", "low quality, blurry, jpeg artifacts, watermark, text, extra fingers, deformed hands"],
+    ["negqPaint", "photo, realistic, photograph, 3d render, plastic skin"],
+    ["negqText", "letters, captions, subtitles, logo, signature, frame, border"],
+  ];
+  const isTurbo = () => (state.setup?.config?.speed || "base") === "turbo";
+  function cfgValue() {
+    const v = parseFloat($("cfg").value);
+    return Number.isFinite(v) ? Math.min(10, Math.max(1, v)) : 1.0;
+  }
+  function renderGuidance() {
+    const cfg = cfgValue(), neg = $("negative").value.trim(), on = cfg > 1.0001;
+    const badge = $("advState");
+    badge.textContent = on ? `CFG ${cfg}` : t("advOff");
+    badge.classList.toggle("on", on);
+    const note = $("cfgNote");
+    const warn = (on && !neg) || (!on && !!neg);
+    note.classList.toggle("warn", warn);
+    note.textContent = !on && neg ? t("negInert")
+      : on && !neg ? t("cfgNoNeg")
+      : on && isTurbo() ? t("cfgTurbo")
+      : on ? t("cfgOn") : t("cfgDefault");
+  }
+  function saveGuidance() { localSet("cfg", String(cfgValue())); localSet("negative", $("negative").value); }
+  $("cfg").addEventListener("input", () => { renderGuidance(); saveGuidance(); });
+  $("cfg").addEventListener("blur", () => { $("cfg").value = String(cfgValue()); saveGuidance(); });
+  $("negative").addEventListener("input", () => { renderGuidance(); saveGuidance(); });
+  $("cfg25").addEventListener("click", () => { $("cfg").value = "2.5"; renderGuidance(); saveGuidance(); $("advBox").open = true; });
+  $("cfg10").addEventListener("click", () => { $("cfg").value = "1"; renderGuidance(); saveGuidance(); });
+  $("advBox").addEventListener("toggle", (e) => localSet("advOpen", e.target.open ? "1" : "0"));
+  function renderNegQuick() {
+    const box = $("negQuick");
+    box.innerHTML = "";
+    for (const [key, text] of NEG_QUICK) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "btn btn-xs";
+      b.textContent = t(key);
+      b.title = text;
+      b.addEventListener("click", () => {
+        const cur = $("negative").value.trim();
+        $("negative").value = cur && !cur.endsWith(",") ? `${cur}, ${text}` : (cur ? `${cur} ${text}` : text);
+        renderGuidance(); saveGuidance();
+      });
+      box.appendChild(b);
+    }
+  }
+  function initGuidance() {
+    $("cfg").value = localGet("cfg", "1");
+    $("negative").value = localGet("negative", "");
+    $("advBox").open = localGet("advOpen", "0") === "1";
+    renderNegQuick();
+    renderGuidance();
+  }
+
   // References
   async function addRefs(paths) {
     const room = MAX_REFS - state.refs.length;
@@ -511,6 +568,8 @@
       aspect,
       seed,
       transparent: state.mode === "text" && $("transparent").checked,
+      negative: $("negative").value.trim(),
+      cfg: cfgValue(),
     };
     state.busy = true;
     state.stepTimes = [];
@@ -582,6 +641,7 @@
     if (m.width) parts.push(`${m.width}×${m.height}`);
     if (m.seed != null) parts.push(`seed ${m.seed}`);
     if (m.preset) parts.push(t(PRESET_KEY[m.preset] || m.preset));
+    if (m.cfg && m.cfg !== 1) parts.push(`cfg ${m.cfg}${m.negative ? " · −" : ""}`);
     if (m.seconds) parts.push(fmtSecs(Math.round(m.seconds)));
     if (m.mode === "photos" && m.references?.length) parts.push(`${m.references.length} ${t("refs")}`);
     $("infoMeta").textContent = parts.join(" · ");
@@ -965,6 +1025,8 @@
   window.addEventListener("langchange", () => {
     renderModeHint();
     renderQuick();
+    renderNegQuick();
+    renderGuidance();
     renderRefs();
     renderHistory();
     renderEngine();
@@ -1007,6 +1069,7 @@
     renderUserPresets();
     renderRefs();
     await wireEvents();
+    initGuidance();
     pollGpu();
     setInterval(pollGpu, 2500);
     const s = await loadSetup().catch((e) => { notifySetup(String(e)); return null; });

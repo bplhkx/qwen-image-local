@@ -25,6 +25,28 @@ pub struct GenRequest {
     pub seed: Option<u64>,
     #[serde(default)]
     pub transparent: bool,
+    /// Conditioning the sampler steers away from. Inert while `cfg` is 1.
+    #[serde(default)]
+    pub negative: String,
+    /// Classifier-free guidance scale. 1.0 is the official Qwen path (no extra cost);
+    /// anything above it runs a second conditioning pass and roughly doubles the step time.
+    #[serde(default = "default_cfg")]
+    pub cfg: f64,
+}
+
+/// The default guidance scale: 1.0, i.e. the model's distilled single-conditioning path.
+pub fn default_cfg() -> f64 {
+    1.0
+}
+
+/// What the engine accepts. Below 1 the negative pull inverts; far above 3 the image burns.
+/// Non-finite input (a CLI `--cfg nan`) falls back to the official 1.0 instead of poisoning the graph.
+pub fn clamp_cfg(v: f64) -> f64 {
+    if v.is_finite() {
+        v.clamp(1.0, 10.0)
+    } else {
+        1.0
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -41,6 +63,10 @@ pub struct GenResult {
     pub prompt: String,
     pub mode: String,
     pub preset: String,
+    /// Negative conditioning actually sent to the engine.
+    pub negative: String,
+    /// Guidance scale actually sent to the engine (clamped).
+    pub cfg: f64,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -102,13 +128,13 @@ pub fn wrap_transparent(p: &str) -> String {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn build_graph(prompt: &str, refs: &[String], w: u32, h: u32, steps: u32, seed: u64, edit_res: u32, encoder: &str, dit: &str) -> Value {
+pub fn build_graph(prompt: &str, refs: &[String], w: u32, h: u32, steps: u32, seed: u64, edit_res: u32, encoder: &str, dit: &str, negative: &str, cfg: f64) -> Value {
     let mut g = json!({
         "unet": {"class_type": "UNETLoader", "inputs": {"unet_name": dit, "weight_dtype": "default"}},
         "clip": {"class_type": "CLIPLoader", "inputs": {"clip_name": encoder, "type": "qwen_image", "device": "default"}},
         "vae": {"class_type": "VAELoader", "inputs": {"vae_name": VAE.name}},
         "enc": {"class_type": "TextEncodeQwenImage21", "inputs": {
-            "clip": ["clip", 0], "prompt": prompt, "negative_prompt": "", "resolution": edit_res}},
+            "clip": ["clip", 0], "prompt": prompt, "negative_prompt": negative, "resolution": edit_res}},
         "decode": {"class_type": "VAEDecode", "inputs": {"samples": ["sampler", 0], "vae": ["vae", 0]}},
         "save": {"class_type": "SaveImage", "inputs": {"images": ["decode", 0], "filename_prefix": "qwen_image_local"}},
     });
@@ -127,7 +153,7 @@ pub fn build_graph(prompt: &str, refs: &[String], w: u32, h: u32, steps: u32, se
         (json!(["cache", 0]), json!(["enc", 2]))
     };
     g["sampler"] = json!({"class_type": "KSampler", "inputs": {
-        "model": model, "seed": seed, "steps": steps, "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple",
+        "model": model, "seed": seed, "steps": steps, "cfg": cfg, "sampler_name": "euler", "scheduler": "simple",
         "positive": ["enc", 0], "negative": ["enc", 1], "latent_image": latent, "denoise": 1.0}});
     g
 }
@@ -201,7 +227,9 @@ pub async fn run(
     let dit_name = cfg.models()[0].name;
     // Turbo runs its distilled 8-step schedule; base keeps the preset's step count.
     let steps = cfg.speed.steps(p.steps);
-    let graph = build_graph(&prompt, &refs, w, h, steps, seed, p.edit_res, cfg.profile.encoder().name, dit_name);
+    let negative = req.negative.trim().to_string();
+    let cfg_scale = clamp_cfg(req.cfg);
+    let graph = build_graph(&prompt, &refs, w, h, steps, seed, p.edit_res, cfg.profile.encoder().name, dit_name, &negative, cfg_scale);
 
     // Open the WebSocket before queueing so the first events are not lost.
     let client_id = format!("qil-{tag}");
@@ -335,11 +363,14 @@ pub async fn run(
         prompt: req.prompt.clone(),
         mode: req.mode.clone(),
         preset: req.preset.clone(),
+        negative: negative.clone(),
+        cfg: cfg_scale,
     };
     let round1 = |x: f64| (x * 10.0).round() / 10.0;
     let meta = json!({
         "prompt": req.prompt, "mode": req.mode, "preset": req.preset, "aspect": req.aspect,
         "seed": seed, "steps": steps, "width": width, "height": height, "transparent": req.transparent,
+        "negative": negative, "cfg": cfg_scale,
         "references": req.images, "seconds": round1(result.seconds), "sampleSeconds": round1(sample_secs),
         "model": "Qwen-Image-2.1", "dit": dit_name, "speed": cfg.speed.id(), "encoder": cfg.profile.encoder().name,
         "app": concat!("qwen-image-local ", env!("CARGO_PKG_VERSION")),
@@ -371,12 +402,46 @@ mod tests {
     #[test]
     fn edit_graph_wires_all_refs() {
         let refs: Vec<String> = (1..=3).map(|i| format!("r{i}.png")).collect();
-        let g = build_graph("x", &refs, 0, 0, 20, 1, 1024, "enc.safetensors", "dit.safetensors");
+        let g = build_graph("x", &refs, 0, 0, 20, 1, 1024, "enc.safetensors", "dit.safetensors", "", 1.0);
         assert_eq!(g["enc"]["inputs"]["images.image_3"], json!(["load3", 0]));
         assert_eq!(g["sampler"]["inputs"]["latent_image"], json!(["enc", 2]));
         assert_eq!(g["clip"]["inputs"]["clip_name"], json!("enc.safetensors"));
         assert_eq!(g["unet"]["inputs"]["unet_name"], json!("dit.safetensors"));
         assert!(g.get("latent").is_none());
+    }
+
+    #[test]
+    fn negative_lands_in_the_encoder_and_cfg_in_the_sampler() {
+        let g = build_graph("cat", &[], 1024, 1024, 20, 1, 1024, "enc.safetensors", "dit.safetensors", "blurry, watermark", 2.5);
+        assert_eq!(g["enc"]["inputs"]["negative_prompt"], json!("blurry, watermark"));
+        assert_eq!(g["sampler"]["inputs"]["cfg"], json!(2.5));
+        // The negative branch is output 1 of the encoder node, which is what the sampler already reads.
+        assert_eq!(g["sampler"]["inputs"]["negative"], json!(["enc", 1]));
+
+        let off = build_graph("cat", &[], 1024, 1024, 20, 1, 1024, "e", "d", "", 1.0);
+        assert_eq!(off["enc"]["inputs"]["negative_prompt"], json!(""));
+        assert_eq!(off["sampler"]["inputs"]["cfg"], json!(1.0));
+    }
+
+    #[test]
+    fn cfg_is_clamped_to_the_engine_range() {
+        assert_eq!(clamp_cfg(0.0), 1.0);
+        assert_eq!(clamp_cfg(1.0), 1.0);
+        assert_eq!(clamp_cfg(2.5), 2.5);
+        assert_eq!(clamp_cfg(99.0), 10.0);
+        assert_eq!(clamp_cfg(f64::NAN), 1.0, "a nan cfg must not reach the graph");
+        assert_eq!(clamp_cfg(f64::INFINITY), 1.0);
+    }
+
+    #[test]
+    fn requests_without_the_new_fields_still_deserialize() {
+        // Old presets, old CLI callers and the v0.4.0 remote protocol send neither field.
+        let r: GenRequest = serde_json::from_str(
+            r#"{"mode":"text","prompt":"p","preset":"draft","aspect":"1:1","seed":null}"#,
+        )
+        .unwrap();
+        assert_eq!(r.negative, "");
+        assert_eq!(r.cfg, 1.0);
     }
 
     #[test]

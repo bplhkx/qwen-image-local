@@ -416,6 +416,9 @@ pub fn capabilities() -> Value {
         "presets": ["draft", "standard", "max"],
         "aspects": ["1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16"],
         "maxRefs": 10,
+        // Additive since 0.4.0: /api/generate also takes "negative" (string) and "cfg"
+        // (1–10, default 1.0). Omitting both keeps the official single-conditioning path.
+        "optional": { "negative": "string", "cfg": "number 1-10, default 1.0" },
     })
 }
 
@@ -485,7 +488,7 @@ mod tests {
         assert_eq!(percent_decode("a%20b+c"), "a b+c", "paths are not form fields");
         assert_eq!(parse_query("limit=5&x=").len(), 2);
         assert_eq!(parse_query("").len(), 0);
-        assert_eq!(url_encode(r"C:\a 图.png").contains(' '), false);
+        assert!(!url_encode(r"C:\a 图.png").contains(' '));
         assert_eq!(percent_decode(&url_encode(r"C:\a 图.png")), r"C:\a 图.png");
     }
 
@@ -537,8 +540,7 @@ mod tests {
 
     #[test]
     fn history_lists_newest_first_with_a_fetch_url() {
-        let mut cfg = Config::default();
-        cfg.output_dir = std::env::temp_dir().join(format!("qil-remote-hist-{}", std::process::id()));
+        let cfg = Config { output_dir: std::env::temp_dir().join(format!("qil-remote-hist-{}", std::process::id())), ..Config::default() };
         let _ = std::fs::remove_dir_all(&cfg.output_dir);
         std::fs::create_dir_all(&cfg.output_dir).unwrap();
         std::fs::write(cfg.output_dir.join("old.png"), b"a").unwrap();

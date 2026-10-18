@@ -113,6 +113,13 @@ struct GenOpts {
     aspect: String,
     #[arg(long)]
     seed: Option<u64>,
+    /// Things to steer away from. Only has an effect with --cfg above 1
+    #[arg(long, default_value = "")]
+    negative: String,
+    /// Classifier-free guidance, 1–10 (default 1 = the official single-conditioning path).
+    /// Above 1 the negative prompt is used and each step costs roughly twice as long.
+    #[arg(long, default_value_t = 1.0)]
+    cfg: f64,
     /// Output .png file or folder (default: your Pictures\Qwen Image Local)
     #[arg(short, long)]
     out: Option<PathBuf>,
@@ -225,6 +232,8 @@ fn request(mode: &str, prompt: String, images: Vec<String>, o: &GenOpts, transpa
         aspect: o.aspect.clone(),
         seed: o.seed,
         transparent,
+        negative: o.negative.clone(),
+        cfg: o.cfg,
     }
 }
 
@@ -355,11 +364,13 @@ async fn one_shot(cfg: &Config, req: GenRequest, opts: &GenOpts) -> Result<(), S
     bar.finish_and_clear();
     let r = res?;
     println!(
-        "{}  {}×{} · seed {} · {:.0} s ({:.1} s/step)",
+        "{}  {}×{} · seed {} · cfg {}{} · {:.0} s ({:.1} s/step)",
         r.path,
         r.width,
         r.height,
         r.seed,
+        r.cfg,
+        if r.negative.is_empty() { "" } else { " · negated" },
         r.seconds,
         r.sample_seconds / r.steps.max(1) as f64
     );
@@ -442,6 +453,8 @@ async fn bench(cfg: &Config, suite: &Path, out: &Path, inputs: &Path, only: &[St
             aspect: t["ar"].as_str().unwrap_or("1:1").into(),
             seed: Some(seed),
             transparent: false, // suite prompts already carry the RGBA wording where needed
+            negative: String::new(),
+            cfg: generate::default_cfg(),
         };
         let running = Arc::new(AtomicBool::new(true));
         let peak = Arc::new(AtomicU32::new(0));

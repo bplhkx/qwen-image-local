@@ -144,7 +144,7 @@ textarea:focus-visible, input:focus-visible, .ref:focus-visible, .hist:focus-vis
 .label-row { display: flex; align-items: center; justify-content: space-between; }
 .hint { font-size: 12px; color: var(--text-muted); }
 
-textarea, input[type="text"] {
+textarea, input[type="text"], input[type="number"] {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--r);
@@ -155,7 +155,7 @@ textarea, input[type="text"] {
   resize: vertical;
 }
 textarea { min-height: 88px; }
-textarea:hover, input[type="text"]:hover:not(:disabled) { border-color: var(--border-strong); }
+textarea:hover, input[type="text"]:hover:not(:disabled), input[type="number"]:hover { border-color: var(--border-strong); }
 input:disabled { background: var(--sunken); color: var(--text-faint); }
 input.mono { font-family: var(--font-mono); font-size: 12px; }
 ::placeholder { color: var(--text-faint); }
@@ -358,6 +358,19 @@ input.mono { font-family: var(--font-mono); font-size: 12px; }
 .setup-foot { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
 .setup-foot .hint { max-width: 60ch; }
 .btn-wide { height: 38px; min-width: 220px; font-size: 13px; }
+
+/* Guidance (negative prompt + CFG): collapsed, because at CFG 1 it does nothing. */
+#advBox { border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
+.adv-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; padding: 8px 10px; list-style: none; }
+.adv-head::-webkit-details-marker { display: none; }
+.adv-head::before { content: "+"; font: 400 13px/1 var(--font-mono); color: var(--text-faint); margin-right: 2px; }
+#advBox[open] .adv-head::before { content: "−"; }
+.adv-state { font: 11.5px var(--font-mono); color: var(--text-faint); }
+.adv-state.on { color: var(--pend); }
+.adv-body { display: flex; flex-direction: column; gap: 8px; padding: 0 10px 10px; border-top: 1px solid var(--border); margin-top: 2px; padding-top: 10px; }
+.adv-cfg { display: flex; align-items: center; gap: 6px; }
+.adv-cfg input { width: 74px; }
+#cfgNote.warn { color: var(--err); }
 @media (max-width: 900px) { .setup-grid { grid-template-columns: 1fr; } }
 
 /* ── Image editor ── */

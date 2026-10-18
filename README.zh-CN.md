@@ -67,6 +67,7 @@ Qwen-Image-2.1 发布于 2026 年 9 月 20 日。它是第一个既**好用**又
 | **编辑** | 1–10 张参考图 | 重打光、改风格、移除物体或人物、重写招牌、合成主体；第一张图是画布 |
 | **标注** | 图片编辑器 | 参考图送进模型前可以先画、圈、框、加箭头、擦除或裁剪；支持撤销、缩放和 90° 旋转 |
 | **随机惊喜** | 创意生成器 | 风格 × 主体 × 地点 × 光线，或一个精选创意；可填主题 |
+| **控制** | 负面提示词 + CFG | 默认关闭：CFG 1 是模型快速的单条件路径。把 CFG 调到 1 以上，负面提示词才会真正从结果里减去——采样耗时约为两倍，所以它是手动开启的，界面也会明确告诉你 |
 | **安装** | 一条命令构建 + 一次性安装 | 锁定版本的 ComfyUI、Python 3.12、PyTorch CUDA 13、权重支持断点续传与 SHA-256 校验 |
 | **命令行** | `qil` | `doctor` · `setup` · `generate` · `edit` · `surprise` · `bench` · `config` |
 | **隐私** | 全程本地 | 提示词和照片只会发往 `127.0.0.1` 上的引擎。每张图都会附带一个记录提示词、种子和参数的 `.json` |
@@ -209,6 +210,7 @@ qil generate "马黛茶壶贴纸" --transparent --aspect 1:1
 qil edit "把场景改成下雪的冬夜" -i street.jpg --preset standard
 qil edit "把 <image2> 里的狗放到 <image1> 的自行车旁" -i bike.jpg -i dog.jpg
 qil surprise --theme capybaras
+qil generate "一只在雪里睡着的红狐" --negative "模糊、水印、多余的腿" --cfg 2.5   # 引导会让采样耗时约为两倍
 qil bench --suite bench/suite.json --preset max       # 复现公开的基准测试
 ```
 
