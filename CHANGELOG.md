@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2 (in progress, not released yet)
+
+- **Batch edit (one job per photo).** A switch under the reference photos turns 图片 mode from "combine everything into one picture" into "run this instruction once per photo". The copies multiplier applies to every photo, so 3 photos × 2 copies is six independent jobs; the Generate button spells the arithmetic out (`逐张改 3 张 ×2 = 6`), the one progress bar spans all of them (`第 4/6 张`), the footer estimate covers the whole run, and 取消 stops what is left. With the switch on there is no canvas: the first photo is no longer marked or framed differently, and the hint under the thumbnails changes to say what actually happens. With one photo the switch makes no difference, so the label stays the plain one. Seeds keep walking forward from a locked seed across the whole run, so a batch edit is reproducible job by job.
+
 ## 0.4.1 — 2026-10-19
 
 - **Negative prompt and CFG.** A negative text box with three shortcut chips and a CFG field (1–10, with one-click 2.5 / back-to-1) sits directly under the description and the instruction, where the positive prompt is. It is off by default, because at CFG 1 — the official Qwen path — the model never reads the negative conditioning, and the field says exactly that in the warning shown the moment you type something with CFG still at 1. Raising CFG costs a second conditioning pass per step: measured on an RTX 4060, 20 steps at 1024² went from 1.6 s/step to 3.0 s/step. Same seed, same prompt, only the negative swapped: `warm colors, red, orange` came out cool (R−B +9.5), `cool colors, blue, cyan` came out amber (R−B +55.8), and 100% of pixels differed — while the same pair at CFG 1 was pixel-for-pixel the same scene.

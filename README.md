@@ -65,7 +65,7 @@ Qwen-Image-2.1 came out on September 20, 2026. It is the first open-weight image
 | **Speed** | Turbo tier | Distilled 8-step checkpoint, about 3–4× faster sampling; pick it on top of any VRAM profile |
 | **Model** | Official or Uncensored | Swap the image model from the setup screen or the main UI; the encoder and VAE are shared, so it is one file |
 | **Transparency** | Native RGBA | Real alpha channel from the model, no background-removal tricks |
-| **Edit** | 1–10 reference photos | Relight, restyle, remove objects or people, rewrite signs, combine subjects; the first photo is the canvas |
+| **Edit** | 1–10 reference photos | Relight, restyle, remove objects or people, rewrite signs, combine subjects; the first photo is the canvas — or flip 批量改图 and the same instruction runs once per photo instead |
 | **Annotate** | Markup editor | Draw, circle, box, arrow, erase or crop a reference photo before it goes in; undo, zoom and 90° rotation included |
 | **Surprise me** | Idea generator | Style × subject × place × light, or a curated idea; optional theme |
 | **Control** | Negative prompt + CFG | Off by default: CFG 1 is the model's fast single-conditioning path. Raise CFG above 1 and the negative text is actually subtracted from the result — about twice the sampling time, so it is opt-in and the UI says so |

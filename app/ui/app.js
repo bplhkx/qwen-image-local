@@ -417,6 +417,7 @@
     $("cfg").value = localGet("cfg", "1");
     $("negative").value = localGet("negative", "");
     $("batch").value = localGet("batch", "1");
+    $("perImage").checked = localGet("perImage", "0") === "1";
     renderNegQuick();
     renderGuidance();
     renderBatch();
@@ -425,14 +426,33 @@
   // Batch: how many pictures one press produces. The seeds walk forward from the
   // locked one, so a batch with the seed pinned is still reproducible.
   function batchCount() { return Math.min(10, Math.max(1, Number($("batch").value) || 1)); }
-  function renderBatch() {
+  // 批量改图: instead of feeding every reference into one composite, run the same
+  // instruction once per photo. The two multipliers combine, so 3 photos × 2 copies
+  // is six independent jobs.
+  function perImageOn() { return state.mode === "photos" && $("perImage").checked && state.refs.length > 0; }
+  function jobImages() {
     const n = batchCount();
-    localSet("batch", String(n));
+    if (perImageOn()) {
+      const out = [];
+      for (const r of state.refs) for (let k = 0; k < n; k++) out.push([r.path]);
+      return out;
+    }
+    const shared = state.mode === "photos" ? state.refs.map((r) => r.path) : [];
+    return Array.from({ length: n }, () => shared);
+  }
+  function renderBatch() {
+    const jobs = jobImages().length;
+    localSet("batch", String(batchCount()));
     const secs = state.lastSampleSecs;
-    $("batchEta").textContent = n > 1 && secs ? `≈ ${fmtSecs(Math.round(secs * n))}` : "";
+    $("batchEta").textContent = jobs > 1 && secs ? `≈ ${fmtSecs(Math.round(secs * jobs))}` : "";
     updateGenButton();
   }
   $("batch").addEventListener("change", renderBatch);
+  $("perImage").addEventListener("change", () => {
+    localSet("perImage", $("perImage").checked ? "1" : "0");
+    renderRefs();
+    renderBatch();
+  });
 
   // References
   async function addRefs(paths) {
@@ -466,12 +486,13 @@
   }
   function renderRefs() {
     const box = $("refs");
+    const per = perImageOn(); // no canvas under 批量改图: every photo is its own job
     box.innerHTML = "";
     box.classList.toggle("empty", state.refs.length === 0);
     state.refs.forEach((r, i) => {
       const el = document.createElement("div");
-      el.className = "ref" + (i === 0 ? " canvas" : "");
-      el.title = (i === 0 ? t("canvas") + " · " : "") + r.path;
+      el.className = "ref" + (!per && i === 0 ? " canvas" : "");
+      el.title = (!per && i === 0 ? t("canvas") + " · " : "") + r.path;
       el.innerHTML = `${r.thumb ? `<img src="${r.thumb}" alt="">` : ""}<span class="n">${i + 1}</span><button type="button" class="rot" aria-label="${t("edit")}" title="${t("edit")}">✎</button><button type="button" class="x" aria-label="${t("remove")}">×</button>`;
       el.querySelector(".x").addEventListener("click", () => { state.refs.splice(i, 1); renderRefs(); updateGenButton(); });
       el.querySelector(".rot").addEventListener("click", (e) => { e.stopPropagation(); editRef(r); });
@@ -487,6 +508,7 @@
       box.appendChild(add);
     }
     $("refCount").textContent = `${state.refs.length} / ${MAX_REFS}`;
+    $("refsHint").innerHTML = t(per ? "perImageHint" : "refsHint");
   }
   function renderQuick() {
     const q = $("quick");
@@ -517,9 +539,13 @@
     else if (state.mode === "photos" && state.refs.length === 0) { label = t("needPhoto"); ok = false; }
     else if (!currentPrompt()) { label = state.mode === "photos" ? t("needInstr") : t("needDesc"); ok = false; }
     else if (state.mode === "surprise") label = t("genSurprise");
-    else if (state.mode === "photos") label = state.refs.length > 1 ? t("genWith", state.refs.length) : t("genEdit");
+    else if (state.mode === "photos") {
+      // The per-image label already does the arithmetic, so it replaces the plain one.
+      if (perImageOn() && state.refs.length > 1) label = t("genPerImage", state.refs.length, batchCount());
+      else label = state.refs.length > 1 ? t("genWith", state.refs.length) : t("genEdit");
+    }
     // The mode wording stays; the batch rides on the end of it.
-    if (ok && batchCount() > 1) label += ` ×${batchCount()}`;
+    if (ok && batchCount() > 1 && !(perImageOn() && state.refs.length > 1)) label += ` ×${batchCount()}`;
     btn.textContent = label;
     btn.disabled = !ok;
     $("cancelBtn").hidden = !state.busy;
@@ -577,11 +603,13 @@
       $("ideaTxt").textContent = prompt;
     }
     const seedBase = $("seedLock").checked && $("seed").value ? Number($("seed").value) : null;
-    const total = batchCount();
+    // One entry per engine job: the photos to feed it. Under 批量改图 that is a single
+    // photo each time; otherwise every reference goes into the same composite.
+    const jobs = jobImages();
+    const total = jobs.length;
     const base = {
       mode: state.mode,
       prompt,
-      images: state.mode === "photos" ? state.refs.map((r) => r.path) : [],
       preset: state.preset,
       aspect,
       transparent: state.mode === "text" && $("transparent").checked,
@@ -600,7 +628,7 @@
     try {
       for (let i = 0; i < total; i++) {
         state.batch.done = i;
-        const req = { ...base, seed: seedBase == null ? null : seedBase + i };
+        const req = { ...base, images: jobs[i], seed: seedBase == null ? null : seedBase + i };
         if (i > 0) { state.stepTimes = []; showWorking("load", 0, 0); }
         const r = await invoke("generate", { req });
         made++;
