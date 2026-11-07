@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.2 (in progress, not released yet)
+## 0.4.2 — 2026-11-08
 
 - **Batch edit (one job per photo).** A switch under the reference photos turns 图片 mode from "combine everything into one picture" into "run this instruction once per photo". The copies multiplier applies to every photo, so 3 photos × 2 copies is six independent jobs; the Generate button spells the arithmetic out (`逐张改 3 张 ×2 = 6`), the one progress bar spans all of them (`第 4/6 张`), the footer estimate covers the whole run, and 取消 stops what is left. With the switch on there is no canvas: the first photo is no longer marked or framed differently, and the hint under the thumbnails changes to say what actually happens. With one photo the switch makes no difference, so the label stays the plain one. Seeds keep walking forward from a locked seed across the whole run, so a batch edit is reproducible job by job.
 
